@@ -1,4 +1,5 @@
 {
+  "macos-build-script.test.ts": "gui",
   "server-combo-held-response.test.ts": "server",
   "key-attribution.test.ts": "usage",
   "provider-send-path-import.test.ts": "server",
@@ -1398,5 +1399,7 @@
   "gui-codex-usage-score-parity.test.ts": "gui",
   "web-search-sidecar-429.test.ts": "web-search",
   "codex-shim-destroyed-probe.test.ts": "codex-integration",
-  "client-runtime.test.ts": "clients"
+  "client-runtime.test.ts": "clients",
+  "usage-timeline.test.ts": "usage",
+  "companion-settings.test.ts": "server"
 }
