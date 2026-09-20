@@ -19,7 +19,7 @@ enum MenuBarTitleSuite {
         }
         t.test("menu title: template replaces placeholders") {
             let settings = CompanionSettings(menuBarTemplate: "{requests}/{totalTokens}/{costUsd}")
-            t.equal(MenuBarTitle.render(settings: settings, today: report, quotas: []), "12/3.46K/$1.25")
+            t.equal(MenuBarTitle.render(settings: settings, today: report, quotas: []), "12/3K/$1.25")
         }
         t.test("menu title: none is nil and unknowns are em dashes") {
             t.isNil(MenuBarTitle.render(settings: CompanionSettings(menuBarMetric: .none), today: report, quotas: []), "none")

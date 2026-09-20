@@ -120,6 +120,7 @@ export default function UsageCompanionPanel({
   const [timelineError, setTimelineError] = useState<string | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [renderedAt] = useState(() => Date.now());
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveBaseline = useRef<CompanionSettings | null>(null);
@@ -276,8 +277,8 @@ export default function UsageCompanionPanel({
       </div>
       {(() => {
         const lastSeenAt = response?.companion?.lastSeenAt ?? null;
-        const connected = lastSeenAt !== null && Date.now() - lastSeenAt <= 10 * 60 * 1000;
-        const age = lastSeenAt === null ? null : formatRelativeTime(lastSeenAt, relativeTimeLabelsFromT(t));
+        const connected = lastSeenAt !== null && renderedAt - lastSeenAt <= 10 * 60 * 1000;
+        const age = lastSeenAt === null ? "" : formatRelativeTime(lastSeenAt, relativeTimeLabelsFromT(t), renderedAt);
         const steps = (
           <ol className="usage-companion-install-steps">
             <li>{t("usage.companion.installStep1")} <a className="btn btn-ghost btn-sm" href="https://github.com/lidge-jun/opencodex/releases/latest" target="_blank" rel="noreferrer">{t("common.github")}</a></li>

@@ -75,8 +75,16 @@ export function formatCompanionTokens(value: number): string {
     [1_000_000, "M"],
     [1_000, "K"],
   ] as const;
-  for (const [threshold, suffix] of units) {
-    if (value >= threshold) return `${Math.round(value / threshold)}${suffix}`;
+  for (let index = 0; index < units.length; index += 1) {
+    const [threshold, suffix] = units[index]!;
+    if (value >= threshold) {
+      const rounded = Math.round(value / threshold);
+      if (rounded >= 1000 && index > 0) {
+        const [largerThreshold, largerSuffix] = units[index - 1]!;
+        return `${Math.round(value / largerThreshold)}${largerSuffix}`;
+      }
+      return `${rounded}${suffix}`;
+    }
   }
   return String(Math.round(value));
 }
