@@ -86,7 +86,9 @@ pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
                         let app = app.clone();
                         let stop_item = stop_item.clone();
                         tauri::async_runtime::spawn(async move {
-                            if proxy.stop().await.is_ok() {
+                            let stopped =
+                                proxy.stop().await.is_ok() || proxy.is_alive().await.is_err();
+                            if stopped {
                                 app.state::<crate::AppState>().shutdown_child();
                                 let _ = stop_item.set_enabled(false);
                             }
