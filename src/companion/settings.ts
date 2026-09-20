@@ -27,7 +27,7 @@ export interface CompanionSettings {
 }
 
 export const DEFAULT_COMPANION_SETTINGS: CompanionSettings = {
-  menuBarMetric: "requests",
+  menuBarMetric: "tokens",
   menuBarTemplate: null,
   showToday: true,
   showChart: true,

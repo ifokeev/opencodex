@@ -10,7 +10,7 @@ enum CompanionSettingsSuite {
         }
         t.test("companion settings: unknown enum uses its default") {
             let settings = try decoder.decode(CompanionSettings.self, from: Data(#"{"menuBarMetric":"future","chartStyle":"future","tokenMetric":"future","aggregation":"future","chartGrouping":"future"}"#.utf8))
-            t.equal(settings.menuBarMetric, .requests)
+            t.equal(settings.menuBarMetric, .tokens)
             t.equal(settings.chartStyle, .line)
             t.equal(settings.tokenMetric, .total)
             t.equal(settings.aggregation, .sum)

@@ -38,14 +38,14 @@ public struct CompanionSettings: Decodable, Equatable, Sendable {
     public let hiddenProviders: [String]
 
     public static let defaults = CompanionSettings(
-        menuBarMetric: .requests, menuBarTemplate: nil,
+        menuBarMetric: .tokens, menuBarTemplate: nil,
         showToday: true, showChart: true, showModels: true, showCost: true, showAccounts: true,
         chartHours: 24, bucketMinutes: 60, chartStyle: .line, tokenMetric: .total,
         aggregation: .sum, chartGrouping: .model, models: nil, hiddenProviders: []
     )
 
     public init(
-        menuBarMetric: MenuBarMetric = .requests,
+        menuBarMetric: MenuBarMetric = .tokens,
         menuBarTemplate: String? = nil,
         showToday: Bool = true,
         showChart: Bool = true,
@@ -86,7 +86,7 @@ public struct CompanionSettings: Decodable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            menuBarMetric: Self.enumValue(MenuBarMetric.self, try c.decodeIfPresent(String.self, forKey: .menuBarMetric), default: .requests),
+            menuBarMetric: Self.enumValue(MenuBarMetric.self, try c.decodeIfPresent(String.self, forKey: .menuBarMetric), default: .tokens),
             menuBarTemplate: try c.decodeIfPresent(String.self, forKey: .menuBarTemplate),
             showToday: try c.decodeIfPresent(Bool.self, forKey: .showToday) ?? true,
             showChart: try c.decodeIfPresent(Bool.self, forKey: .showChart) ?? true,

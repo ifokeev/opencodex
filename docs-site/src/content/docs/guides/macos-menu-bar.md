@@ -76,6 +76,9 @@ you.
 trend. A `~` after the request count means part of it is estimated rather than reported
 by the provider.
 
+By default, the menu bar headline shows total tokens; change the headline metric in the
+dashboard Usage companion settings when you prefer requests, cost, quota, or an icon only.
+
 **Quotas** — one row per provider, showing the window under the most pressure. A
 provider at 99% of a five-hour limit and 10% of its monthly limit shows the five-hour
 figure, because that is the one currently blocking you. The window name is printed under
