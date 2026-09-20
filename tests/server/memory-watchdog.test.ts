@@ -11,6 +11,7 @@ import {
 } from "../../src/server/memory-watchdog";
 import { handleManagementAPI } from "../../src/server/management-api";
 import { selectEagerPath } from "../../src/lib/bun-stream-caps";
+import { reportedBunRuntimeSource } from "../../src/lib/bun-runtime";
 import type { OcxConfig } from "../../src/types";
 import {
   appOwnedBytesSnapshot,
@@ -300,35 +301,40 @@ describe("GET /api/system/memory", () => {
       return await res!.json() as { bunRuntimeSource?: unknown; bunRevision?: unknown };
     };
     try {
-      for (const source of ["override", "bundled", "process"]) {
+      for (const source of ["override", "bundled", "process", "standalone"]) {
         process.env.OCX_BUN_RUNTIME_SOURCE = source;
         // Source alone is not enough: the marker must name THIS executable.
-        expect((await read()).bunRuntimeSource).toBeUndefined();
+        expect(reportedBunRuntimeSource()).toBeUndefined();
         process.env.OCX_BUN_RUNTIME_PATH = process.execPath;
-        expect((await read()).bunRuntimeSource).toBe(source);
+        expect(reportedBunRuntimeSource()).toBe(source);
         delete process.env.OCX_BUN_RUNTIME_PATH;
       }
       // A mismatched recorded path describes another binary — stay absent.
       process.env.OCX_BUN_RUNTIME_SOURCE = "override";
       process.env.OCX_BUN_RUNTIME_PATH = "/usr/local/bin/definitely-not-this-bun";
-      expect((await read()).bunRuntimeSource).toBeUndefined();
+      expect(reportedBunRuntimeSource()).toBeUndefined();
+
+      process.env.OCX_BUN_RUNTIME_SOURCE = "system";
       delete process.env.OCX_BUN_RUNTIME_PATH;
-      delete process.env.OCX_BUN_RUNTIME_SOURCE;
+      expect(reportedBunRuntimeSource()).toBeUndefined();
+
+      process.env.OCX_BUN_RUNTIME_SOURCE = "override";
+      process.env.OCX_BUN_RUNTIME_PATH = process.execPath;
+      expect((await read()).bunRuntimeSource).toBe("override");
+
       // An unset or unrecognized marker must leave the field absent rather than
       // shipping a value doctor would then have to distrust.
+      delete process.env.OCX_BUN_RUNTIME_PATH;
+      delete process.env.OCX_BUN_RUNTIME_SOURCE;
       const unset = await read();
       expect(unset.bunRuntimeSource).toBeUndefined();
       expect(typeof unset.bunRevision).toBe("string");
-
-      process.env.OCX_BUN_RUNTIME_SOURCE = "system";
-      expect((await read()).bunRuntimeSource).toBeUndefined();
     } finally {
       if (inherited === undefined) delete process.env.OCX_BUN_RUNTIME_SOURCE;
       else process.env.OCX_BUN_RUNTIME_SOURCE = inherited;
       delete process.env.OCX_BUN_RUNTIME_PATH;
     }
-    // The route costs ~600 ms per read on the shared CI runners, and this test makes
-    // eight of them — marginally over bun's 5 s default on a loaded box.
+    // Two route reads only: each one walks the JSC heap via heapStats(), which is what made nine of them exceed the budget on loaded macOS runners; the env matrix is covered on the pure function above.
   }, 20_000);
 
   test("GET system memory includes privacy-safe appOwnedBytes scalars", async () => {
