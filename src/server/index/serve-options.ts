@@ -24,6 +24,7 @@ import {
 } from "./startup-warnings";
 
 import { remoteWorkspaceEnabled } from "../../remote-control/workspace-activation";
+import { isClaudeInterceptedPath } from "../../claude/intercept/listener";
 import { markActivity } from "../../lib/sidecar-tracker";
 import { knownModelIdsForProvider } from "../../router";
 import {
@@ -205,7 +206,7 @@ export type ServerIngress = "public" | "unauthenticated-loopback" | "hub-managem
  * is a bug, not a client — refuse it.
  */
 export function claudeInterceptRouteAllowed(url: URL, req: Request): boolean {
-  return req.method === "POST" && (url.pathname === "/v1/messages" || url.pathname === "/v1/messages/count_tokens");
+  return isClaudeInterceptedPath(url.pathname, req.method);
 }
 
 export interface ServeOptionsContext {

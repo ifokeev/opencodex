@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { connect, createServer } from "node:net";
-import { CLAUDE_INTERCEPT_HOSTS, parseConnectRequestLine, startConnectProxy, type ConnectProxyHandle } from "../../src/claude/intercept/connect-proxy";
+import { CLAUDE_INTERCEPT_HOSTS, isLoopbackTarget, parseConnectRequestLine, startConnectProxy, type ConnectProxyHandle } from "../../src/claude/intercept/connect-proxy";
 import { startClaudeInterceptListener, rewriteInterceptedRequest } from "../../src/claude/intercept/listener";
 import { createLocalInterceptCa, issueLocalInterceptLeaf } from "../../src/claude/intercept/local-ca";
 
@@ -146,7 +146,17 @@ test("plain proxied HTTP, loopback targets and oversized heads are refused", asy
   expect(await rawRequest(proxy.port, "GET http://example.com/ HTTP/1.1\r\nHost: example.com\r\n\r\n")).toStartWith("HTTP/1.1 405");
   expect(await rawRequest(proxy.port, "CONNECT 127.0.0.1:22 HTTP/1.1\r\n\r\n")).toStartWith("HTTP/1.1 403");
   expect(await rawRequest(proxy.port, "CONNECT localhost:443 HTTP/1.1\r\n\r\n")).toStartWith("HTTP/1.1 403");
+  expect(await rawRequest(proxy.port, "CONNECT [::ffff:127.0.0.1]:22 HTTP/1.1\r\n\r\n")).toStartWith("HTTP/1.1 403");
   expect(await rawRequest(proxy.port, `CONNECT a:443 HTTP/1.1\r\nX: ${"y".repeat(9000)}`)).toStartWith("HTTP/1.1 431");
+});
+
+test("isLoopbackTarget covers mapped, unspecified and shorthand loopback literals", () => {
+  for (const host of ["localhost", "foo.localhost", "127.0.0.1", "127.255.0.9", "::1", "::ffff:127.0.0.1", "::ffff:7f00:1", "0.0.0.0", "::", "127.1", "0x7f000001", "2130706433"]) {
+    expect(isLoopbackTarget(host)).toBe(true);
+  }
+  for (const host of ["api.anthropic.com", "10.0.0.1", "::ffff:10.0.0.1", "2606:4700::1", "1.example"]) {
+    expect(isLoopbackTarget(host)).toBe(false);
+  }
 });
 
 test("a dead upstream yields 502 instead of a hung tunnel", async () => {

@@ -1,4 +1,4 @@
-import { createServer, connect, type Server, type Socket } from "node:net";
+import { BlockList, createServer, connect, isIP, type Server, type Socket } from "node:net";
 
 /**
  * Loopback HTTP CONNECT proxy for Claude Code.
@@ -52,8 +52,20 @@ export function parseConnectRequestLine(head: string): ConnectTarget | null {
   return { host: hostPort[1]!.toLowerCase().replace(/\.$/, ""), port };
 }
 
-function isLoopbackTarget(host: string): boolean {
-  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host.startsWith("127.");
+// 127/8 and ::1, which `BlockList` also matches in IPv4-mapped form (`::ffff:127.0.0.1`,
+// `::ffff:7f00:1`). The unspecified addresses dial the local host too.
+const LOCAL_TARGETS = new BlockList();
+LOCAL_TARGETS.addSubnet("127.0.0.0", 8, "ipv4");
+LOCAL_TARGETS.addAddress("0.0.0.0", "ipv4");
+LOCAL_TARGETS.addAddress("::1", "ipv6");
+LOCAL_TARGETS.addAddress("::", "ipv6");
+
+export function isLoopbackTarget(host: string): boolean {
+  if (host === "localhost" || host.endsWith(".localhost")) return true;
+  const family = isIP(host);
+  if (family !== 0) return LOCAL_TARGETS.check(host, family === 6 ? "ipv6" : "ipv4");
+  // `127.1`, `0x7f000001`, `2130706433`: resolver shorthand for a loopback literal, not a name.
+  return /^(0x[0-9a-f]+|\d+)(\.(0x[0-9a-f]+|\d+))*$/.test(host);
 }
 
 function respond(socket: Socket, status: number, reason: string): void {
