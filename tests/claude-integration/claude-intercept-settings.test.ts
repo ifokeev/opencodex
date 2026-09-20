@@ -9,6 +9,7 @@ import {
   removeClaudeInterceptSettings,
 } from "../../src/claude/intercept/settings";
 import { claudeInterceptEnabled, claudeInterceptProxyPort } from "../../src/claude/intercept/runtime";
+import { configSchema } from "../../src/config/schema/config-schema";
 
 const CA = "/home/u/.opencodex/claude-intercept/ca.pem";
 const env = buildClaudeInterceptEnv(8846, CA);
@@ -97,4 +98,15 @@ test("intercept is on by default for a hub, off for clients and when Claude Code
   expect(claudeInterceptProxyPort({}, 8746)).toBe(8846);
   expect(claudeInterceptProxyPort({ claudeCode: { intercept: { port: 9100 } } }, 8746)).toBe(9100);
   expect(claudeInterceptProxyPort({ claudeCode: { intercept: { port: 0 } } }, 8746)).toBe(8846);
+});
+
+test("claudeCode.intercept is validated by the config schema", () => {
+  const base = {
+    port: 0, defaultProvider: "openai",
+    providers: { openai: { adapter: "openai-responses", baseUrl: "https://chatgpt.com/backend-api/codex", authMode: "forward", codexAccountMode: "direct" } },
+  };
+  expect(configSchema.safeParse({ ...base, claudeCode: { intercept: { enabled: false, port: 9100 } } }).success).toBe(true);
+  expect(configSchema.safeParse({ ...base, claudeCode: { intercept: "off" } }).success).toBe(false);
+  expect(configSchema.safeParse({ ...base, claudeCode: { intercept: { enabled: "no" } } }).success).toBe(false);
+  expect(configSchema.safeParse({ ...base, claudeCode: { intercept: { port: 70000 } } }).success).toBe(false);
 });
