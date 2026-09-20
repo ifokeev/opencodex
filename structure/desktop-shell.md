@@ -20,3 +20,5 @@ The management API companion presence check in
 `src/server/management/companion-routes.ts` accepts both
 `OpenCodexMenuBar/` and `OpenCodexDesktop/` user agents. This is presence
 telemetry only; management authentication remains in the shared API boundary.
+The desktop webview uses a Mozilla-compatible `OpenCodexDesktop/` user-agent
+marker, which the GUI detects to identify the shell without using IPC.

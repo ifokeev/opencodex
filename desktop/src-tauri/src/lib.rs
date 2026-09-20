@@ -85,6 +85,7 @@ pub fn run() {
             .title("OpenCodex")
             .inner_size(1100.0, 720.0)
             .visible(false)
+            .user_agent(&window::webview_user_agent())
             .on_navigation(window::navigation_allowed(endpoint))
             .build()?;
             window::configure(&window);

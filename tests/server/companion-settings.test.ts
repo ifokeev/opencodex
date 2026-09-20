@@ -22,8 +22,8 @@ async function withHome<T>(run: (home: string) => Promise<T> | T): Promise<T> {
     rmSync(home, { recursive: true, force: true });
   }
 }
-async function call(method: string, body?: unknown, userAgent?: string): Promise<{ status: number; body: any }> {
-  const url = new URL("http://127.0.0.1:10100/api/companion/settings");
+async function callPath(path: string, method: string, body?: unknown, userAgent?: string): Promise<{ status: number; body: any }> {
+  const url = new URL(`http://127.0.0.1:10100${path}`);
   const req = new Request(url, {
     method,
     headers: {
@@ -35,6 +35,9 @@ async function call(method: string, body?: unknown, userAgent?: string): Promise
   });
   const response = await handleManagementAPI(req, url, config, {}, "admin-token");
   return { status: response?.status ?? 404, body: response ? await response.json() : null };
+}
+async function call(method: string, body?: unknown, userAgent?: string): Promise<{ status: number; body: any }> {
+  return callPath("/api/companion/settings", method, body, userAgent);
 }
 
 describe("companion settings", () => {
@@ -81,9 +84,24 @@ describe("companion settings", () => {
       expect(ordinary.body.companion.lastSeenAt).toBeNull();
       const companion = await call("GET", undefined, "OpenCodexMenuBar/2.60.0");
       expect(companion.body.companion.lastSeenAt).toBeNumber();
+      expect(companion.body.companion.kind).toBe("menuBar");
       resetCompanionPresenceForTests();
       const desktop = await call("GET", undefined, "OpenCodexDesktop/2.61.0");
       expect(desktop.body.companion.lastSeenAt).toBeNumber();
+      expect(desktop.body.companion.kind).toBe("desktop");
+    });
+  });
+
+  test("opens only validated local dashboard paths in the browser", async () => {
+    await withHome(async () => {
+      for (const path of ["https://x", "//x", 42]) {
+        const result = await callPath("/api/companion/open-in-browser", "POST", { path });
+        expect(result.status).toBe(400);
+        expect(result.body).toEqual({ error: "invalid path" });
+      }
+      const result = await callPath("/api/companion/open-in-browser", "POST", { path: "/#/usage" });
+      expect(result.status).toBe(200);
+      expect(result.body).toEqual({ ok: true, url: "http://127.0.0.1:10100/#/usage" });
     });
   });
 });

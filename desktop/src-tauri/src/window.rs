@@ -1,5 +1,9 @@
-use crate::discovery::ProxyEndpoint;
+use crate::{auth::Auth, discovery::ProxyEndpoint};
 use tauri::{AppHandle, Manager, Url, WebviewWindow, WindowEvent};
+
+pub fn webview_user_agent() -> String {
+    format!("Mozilla/5.0 {}", Auth::user_agent())
+}
 
 pub fn configure(window: &WebviewWindow) {
     let window_for_close = window.clone();
@@ -55,4 +59,16 @@ fn apply_tray_policy(_app: &AppHandle, _visible: bool) {}
 
 pub fn set_tray_policy(app: &AppHandle, visible: bool) {
     apply_tray_policy(app, visible);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::webview_user_agent;
+
+    #[test]
+    fn webview_user_agent_marks_the_desktop_shell() {
+        let user_agent = webview_user_agent();
+        assert!(user_agent.starts_with("Mozilla/5.0 "));
+        assert!(user_agent.contains("OpenCodexDesktop/"));
+    }
 }
