@@ -305,7 +305,10 @@ jobs:
           merge-multiple: true
           path: dist/release
 
+      # Fails when no signed updater artifact exists (no TAURI_SIGNING_PRIVATE_KEY);
+      # the unsigned assets still attach, only latest.json is skipped.
       - name: Generate updater manifest
+        continue-on-error: true
         env:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
