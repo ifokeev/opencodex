@@ -81,6 +81,49 @@ export function formatCompanionTokens(value: number): string {
   return String(Math.round(value));
 }
 
+export interface CompanionModelGroup {
+  provider: string;
+  models: { id: string; total: number }[];
+  total: number;
+}
+
+export function groupCompanionModels(
+  available: string[],
+  totals: Map<string, number>,
+): CompanionModelGroup[] {
+  const groups = new Map<string, CompanionModelGroup>();
+  for (const id of available) {
+    const provider = id.includes("/") ? id.slice(0, id.indexOf("/")) : id;
+    const group = groups.get(provider) ?? { provider, models: [], total: 0 };
+    const total = totals.get(id) ?? 0;
+    group.models.push({ id, total });
+    group.total += total;
+    groups.set(provider, group);
+  }
+  return Array.from(groups.values())
+    .map(group => ({
+      ...group,
+      models: group.models.toSorted((a, b) => b.total - a.total || a.id.localeCompare(b.id)),
+    }))
+    .toSorted((a, b) => b.total - a.total || a.provider.localeCompare(b.provider));
+}
+
+export function toggleCompanionModels(
+  selected: string[] | null,
+  available: string[],
+  ids: string[],
+  on: boolean,
+): string[] | null {
+  const availableSet = new Set(available);
+  const next = new Set((selected ?? available).filter(id => availableSet.has(id)));
+  for (const id of ids) {
+    if (on) next.add(id);
+    else next.delete(id);
+  }
+  if (available.length > 0 && available.every(id => next.has(id))) return null;
+  return available.filter(id => next.has(id));
+}
+
 export function buildCompanionSettingsPatch(
   patch: Partial<CompanionSettings>,
   availableModels: readonly string[] = [],

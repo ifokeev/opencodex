@@ -242,6 +242,21 @@
 .usage-companion-install-steps .btn { margin-left: 6px; }
 .usage-companion-install-last-seen { margin: 0; }
 .usage-companion-install-command { display: block; overflow-x: auto; padding: 7px 9px; border-radius: var(--radius-xs); background: var(--raised); color: var(--text); font-size: 11px; }
+.usage-companion-models { display: grid; gap: 8px; }
+.usage-companion-models-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.usage-companion-models-header > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.usage-companion-models-count { white-space: nowrap; }
+.usage-companion-models-list { max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.usage-companion-model-group + .usage-companion-model-group { border-top: 1px solid var(--border-soft); }
+.usage-companion-model-group-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 7px; padding: 8px 10px; background: color-mix(in srgb, var(--surface) 92%, var(--raised)); }
+.usage-companion-model-provider { flex: 1; min-width: 0; overflow: hidden; color: var(--text); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.usage-companion-model-chip { padding: 2px 5px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+.usage-companion-model-group-header .switch { flex: 0 0 auto; }
+.usage-companion-model-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 10px 7px 18px; }
+.usage-companion-model-row .switch { flex: 0 0 auto; }
+.usage-companion-model-row code { min-width: 0; overflow: hidden; color: var(--text); text-overflow: ellipsis; white-space: nowrap; }
+.usage-companion-model-row.is-off code { color: var(--faint); text-decoration: line-through; }
+.usage-companion-model-total { flex: 0 0 auto; margin-left: auto; font-variant-numeric: tabular-nums; }
 .usage-companion-chart { min-width: 0; }
 .usage-companion-chart svg { display: block; width: 100%; height: 160px; overflow: visible; }
 .usage-companion-axis { stroke: var(--border); stroke-width: 1; }

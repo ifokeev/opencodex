@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useI18n } from "../i18n/shared";
 import { relativeTimeLabelsFromT, formatRelativeTime } from "../provider-workspace/usage";
+import { Switch } from "../ui";
 import { UsageCompanionChart } from "./usage-companion-chart";
 import {
   bucketMinutesForWindow,
   buildCompanionSettingsPatch,
+  formatCompanionTokens,
+  groupCompanionModels,
+  toggleCompanionModels,
   type CompanionSettings,
   type CompanionSettingsResponse,
   type UsageTimeline,
@@ -248,6 +252,11 @@ export default function UsageCompanionPanel({
   const providerNames = providers.map(provider => provider.provider).filter((provider, index, all) => all.indexOf(provider) === index).toSorted();
   const selectedModels = current.models ?? availableModels;
   const selectedModelSet = new Set(selectedModels);
+  const modelTotals = new Map<string, number>();
+  for (const series of timeline?.series ?? []) {
+    modelTotals.set(series.id, (modelTotals.get(series.id) ?? 0) + series.total);
+  }
+  const modelGroups = groupCompanionModels(availableModels, modelTotals);
   const hiddenProviderSet = new Set(current.hiddenProviders);
   const saveMessage = saveState === "saved" && response?.updatedAt
     ? t("usage.companion.saved", { time: formatSaveTime(response.updatedAt, locale) })
@@ -296,6 +305,49 @@ export default function UsageCompanionPanel({
         );
       })()}
       <UsageCompanionChart timeline={timeline} chartStyle={current.chartStyle} hours={current.chartHours} loading={timelineLoading} error={timelineError} onRetry={() => void loadTimeline()} locale={locale} t={t} />
+      {modelGroups.length > 0 && <section className="usage-companion-models">
+        <div className="usage-companion-models-header">
+          <div>
+            <span className="field-label">{t("usage.companion.modelsOnChart")}</span>
+            <span className="usage-companion-models-count text-caption muted">{t("usage.companion.modelsCount", { selected: selectedModels.length, total: availableModels.length })}</span>
+          </div>
+          {current.models !== null && <button type="button" className="btn btn-ghost btn-sm" onClick={() => updateSettings({ models: null })} disabled={response?.corrupt}>{t("usage.companion.modelsShowAll")}</button>}
+        </div>
+        <div className="usage-companion-models-list">
+          {modelGroups.map(group => {
+            const selectedCount = group.models.filter(model => selectedModelSet.has(model.id)).length;
+            const groupOn = selectedCount === group.models.length;
+            return <div key={group.provider} className="usage-companion-model-group">
+              <div className="usage-companion-model-group-header">
+                <span className="usage-companion-model-provider">{group.provider}</span>
+                <span className="usage-companion-model-chip mono text-caption">{group.models.length}</span>
+                <Switch
+                  on={groupOn}
+                  mixed={selectedCount > 0 && !groupOn}
+                  onClick={() => updateSettings({ models: toggleCompanionModels(current.models, availableModels, group.models.map(model => model.id), !groupOn) })}
+                  disabled={response?.corrupt}
+                  label={group.provider}
+                  title={group.provider}
+                />
+              </div>
+              {group.models.map(model => {
+                const on = selectedModelSet.has(model.id);
+                return <div key={model.id} className={`usage-companion-model-row${on ? "" : " is-off"}`}>
+                  <Switch
+                    on={on}
+                    onClick={() => updateSettings({ models: toggleCompanionModels(current.models, availableModels, [model.id], !on) })}
+                    disabled={response?.corrupt}
+                    label={model.id}
+                    title={model.id}
+                  />
+                  <code className="mono text-control">{model.id}</code>
+                  <span className="usage-companion-model-total muted text-caption">{modelTotals.has(model.id) ? formatCompanionTokens(model.total) : "—"}</span>
+                </div>;
+              })}
+            </div>;
+          })}
+        </div>
+      </section>}
       <fieldset className="usage-companion-controls" disabled={response?.corrupt}>
         <Segment label={t("usage.companion.menuBarShows")} value={current.menuBarMetric} options={MENU_METRICS} optionLabel={value => t(`usage.companion.menu${value[0]!.toUpperCase()}${value.slice(1)}` as never)} onChange={value => updateSettings({ menuBarMetric: value })} />
         <Segment label={t("usage.companion.window")} value={current.chartHours} options={WINDOWS} optionLabel={value => t(`usage.companion.window${value}` as never)} onChange={value => updateSettings({ chartHours: value, bucketMinutes: bucketMinutesForWindow(value) })} />
@@ -326,7 +378,6 @@ export default function UsageCompanionPanel({
               <input value={current.menuBarTemplate ?? ""} onChange={event => updateSettings({ menuBarTemplate: event.target.value })} maxLength={200} />
               <span className="muted text-caption">{t("usage.companion.placeholders")} <code>{"{requests} {totalTokens} {inputTokens} {outputTokens} {costUsd} {quotaPercent}"}</code></span>
             </label>
-            {availableModels.length > 0 && <fieldset className="usage-companion-check-list"><legend className="field-label">{t("usage.companion.modelsOnChart")}</legend>{availableModels.map(model => <label key={model}><input type="checkbox" checked={selectedModelSet.has(model)} onChange={event => updateSettings({ models: event.target.checked ? [...selectedModels, model] : selectedModels.filter(item => item !== model) })} /> <span>{model}</span></label>)}</fieldset>}
             {providerNames.length > 0 && <fieldset className="usage-companion-check-list"><legend className="field-label">{t("usage.companion.hideProviders")}</legend>{providerNames.map(provider => <label key={provider}><input type="checkbox" checked={hiddenProviderSet.has(provider)} onChange={event => updateSettings({ hiddenProviders: event.target.checked ? [...current.hiddenProviders, provider] : current.hiddenProviders.filter(item => item !== provider) })} /> <span>{provider}</span></label>)}</fieldset>}
           </div>
         </details>
