@@ -569,9 +569,12 @@ OpenCode Go's exact `union-alpha` model id is hard-pinned to the Anthropic wire 
 surface; sibling models retain their existing Chat or Responses selection. This wire choice and the
 session namespace do not assert upstream availability after the Messages endpoint accepts the
 session header.
-Muse Spark's Responses sanitizer also drops the provider-rejected `search_content_types` and
-`indexed_web_access` fields from plain `web_search` tools while preserving preview tools and
-unrelated models.
+`src/adapters/openai-responses/web-search.ts` also drops the provider-rejected
+`search_content_types` and `indexed_web_access` fields from plain `web_search` tools while
+preserving preview tools. The two OpenCode Zen destinations gate that on a Contributor Muse id
+because they serve nothing else; the direct Meta destination below is the whole predicate,
+because Meta's refusal is a gateway schema rule for every Muse model it serves and its default
+`muse-spark-1.3` is not a Contributor id.
 
 Direct Meta Muse / Meta Model Responses (`https://api.meta.ai/v1`) also rejects function tool
 names longer than 64 characters or containing characters outside `[a-zA-Z0-9_-]`. After namespace
