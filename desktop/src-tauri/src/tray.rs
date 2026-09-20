@@ -1,6 +1,9 @@
 use crate::{formatting, proxy::ProxyClient, updater, widget, window};
 use serde_json::Value;
-use std::sync::{atomic::Ordering, Mutex};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Mutex,
+};
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -9,7 +12,10 @@ use tauri::{
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 
-pub struct TrayState(pub Mutex<Option<UpdateMenu>>);
+pub struct TrayState {
+    pub menu: Mutex<Option<UpdateMenu>>,
+    pub installing: AtomicBool,
+}
 
 pub struct UpdateMenu {
     check_updates: MenuItem<Wry>,
@@ -18,7 +24,10 @@ pub struct UpdateMenu {
 
 impl Default for TrayState {
     fn default() -> Self {
-        Self(Mutex::new(None))
+        Self {
+            menu: Mutex::new(None),
+            installing: AtomicBool::new(false),
+        }
     }
 }
 
@@ -64,7 +73,7 @@ pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
             &quit,
         ],
     )?;
-    if let Ok(mut state) = app.state::<TrayState>().0.lock() {
+    if let Ok(mut state) = app.state::<TrayState>().menu.lock() {
         *state = Some(UpdateMenu {
             check_updates: check_updates.clone(),
             install_update: install_update.clone(),
@@ -139,14 +148,21 @@ pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
                         .0
                         .lock()
                         .ok()
-                        .and_then(|pending| pending.clone());
+                        .and_then(|mut pending| pending.take());
                     let Some(update) = update else {
                         return;
                     };
                     let version = update.version.clone();
+                    let retry_update = update.clone();
+                    set_installing(&app, &version);
                     if let Err(error) = updater::install(&app, update).await {
+                        if let Ok(mut pending) =
+                            app.state::<crate::updater::PendingUpdate>().0.lock()
+                        {
+                            *pending = Some(retry_update);
+                        }
+                        set_install_failed(&app, &version);
                         crate::logging::log_once("updater install failed", &error);
-                        show_update_available(&app, &version);
                     }
                 });
             }
@@ -174,7 +190,7 @@ pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
 
 pub fn show_update_available(app: &AppHandle, version: &str) {
     if let Some(state) = app.try_state::<TrayState>() {
-        if let Ok(menu) = state.0.lock() {
+        if let Ok(menu) = state.menu.lock() {
             if let Some(menu) = menu.as_ref() {
                 let _ = menu.install_update.set_text(updater::update_label(version));
                 let _ = menu.install_update.set_enabled(true);
@@ -187,7 +203,7 @@ pub fn show_update_available(app: &AppHandle, version: &str) {
 
 pub fn show_up_to_date(app: &AppHandle) {
     if let Some(state) = app.try_state::<TrayState>() {
-        if let Ok(menu) = state.0.lock() {
+        if let Ok(menu) = state.menu.lock() {
             if let Some(menu) = menu.as_ref() {
                 let _ = menu
                     .check_updates
@@ -197,6 +213,33 @@ pub fn show_up_to_date(app: &AppHandle) {
             }
         }
     }
+}
+
+pub fn is_installing(app: &AppHandle) -> bool {
+    app.try_state::<TrayState>()
+        .is_some_and(|state| state.installing.load(Ordering::Acquire))
+}
+
+fn set_installing(app: &AppHandle, version: &str) {
+    if let Some(state) = app.try_state::<TrayState>() {
+        state.installing.store(true, Ordering::Release);
+        if let Ok(menu) = state.menu.lock() {
+            if let Some(menu) = menu.as_ref() {
+                let _ = menu
+                    .install_update
+                    .set_text(format!("Installing update v{version}…"));
+                let _ = menu.install_update.set_enabled(false);
+                let _ = menu.check_updates.set_enabled(false);
+            }
+        }
+    }
+}
+
+fn set_install_failed(app: &AppHandle, version: &str) {
+    if let Some(state) = app.try_state::<TrayState>() {
+        state.installing.store(false, Ordering::Release);
+    }
+    show_update_available(app, version);
 }
 
 fn refresh_title(tray: &tauri::tray::TrayIcon<Wry>, proxy: &ProxyClient) {

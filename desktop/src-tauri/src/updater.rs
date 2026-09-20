@@ -36,8 +36,14 @@ pub fn start_background_checks(app: AppHandle) {
 }
 
 pub async fn check_and_show(app: &AppHandle) {
+    if tray::is_installing(app) {
+        return;
+    }
     match check(app).await {
         Ok(Some(update)) => {
+            if tray::is_installing(app) {
+                return;
+            }
             let version = update.version.clone();
             if let Ok(mut pending) = app.state::<PendingUpdate>().0.lock() {
                 *pending = Some(update);

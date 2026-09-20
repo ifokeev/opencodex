@@ -63,6 +63,8 @@ Choose **Check for Updates…** in the tray menu to check immediately. Release b
 check automatically after startup and every six hours. Updates are verified with the
 project's signed updater public key before installation. On macOS, in-app updates download
 `OpenCodex-<version>-macos.app.tar.gz`; the DMG is for the first installation.
+The release manifest is generated only when the updater key secret is configured and then
+requires all four platforms to be signed.
 
 ## Widget
 

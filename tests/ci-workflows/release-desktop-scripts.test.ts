@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { collectReleaseAssets } from "../../desktop/scripts/collect-release-assets";
-import { buildUpdaterManifest } from "../../desktop/scripts/updater-manifest";
+import { buildUpdaterManifest, writeUpdaterManifest } from "../../desktop/scripts/updater-manifest";
 
 function temporaryDirectory(): string {
   return mkdtempSync(join(tmpdir(), "opencodex-release-"));
@@ -91,6 +91,39 @@ describe("desktop release scripts", () => {
     }
   });
 
+  test("rejects ambiguous bundle matches", () => {
+    const root = temporaryDirectory();
+    try {
+      const bundleRoot = join(
+        root,
+        "desktop",
+        "src-tauri",
+        "target",
+        "aarch64-apple-darwin",
+        "release",
+        "bundle",
+      );
+      const dmg = join(bundleRoot, "dmg");
+      const macos = join(bundleRoot, "macos");
+      mkdirSync(dmg, { recursive: true });
+      mkdirSync(macos, { recursive: true });
+      writeFileSync(join(dmg, "OpenCodex_2.61.0_aarch64.dmg"), "dmg");
+      writeFileSync(join(dmg, "OpenCodex_2.61.0_universal.dmg"), "dmg");
+      writeFileSync(join(macos, "OpenCodex.app.tar.gz"), "archive");
+
+      expect(() =>
+        collectReleaseAssets({
+          version: "2.61.0",
+          target: "aarch64-apple-darwin",
+          out: join(root, "release"),
+          repoRoot: root,
+        }),
+      ).toThrow(/Multiple dmg bundles found/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("generates signed updater platforms and skips missing signatures", () => {
     const root = temporaryDirectory();
     try {
@@ -121,6 +154,44 @@ describe("desktop release scripts", () => {
       });
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toContain("linux-x86_64");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("does not write a manifest when no signed updater platforms remain", () => {
+    const root = temporaryDirectory();
+    try {
+      const out = join(root, "latest.json");
+      expect(() =>
+        writeUpdaterManifest({
+          version: "2.61.0",
+          dir: root,
+          repo: "lidge-jun/opencodex",
+          out,
+        }),
+      ).toThrow("No signed updater platforms");
+      expect(existsSync(out)).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("requires every updater platform signature when requested", () => {
+    const root = temporaryDirectory();
+    try {
+      writeFileSync(join(root, "OpenCodex-2.61.0-macos.app.tar.gz.sig"), "mac-signature\n");
+      writeFileSync(join(root, "OpenCodex-2.61.0-windows-x64.msi.sig"), "win-signature\n");
+
+      expect(() =>
+        buildUpdaterManifest({
+          version: "2.61.0",
+          dir: root,
+          repo: "lidge-jun/opencodex",
+          out: join(root, "latest.json"),
+          requireAll: true,
+        }),
+      ).toThrow("Missing signed updater platforms: linux-x86_64");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

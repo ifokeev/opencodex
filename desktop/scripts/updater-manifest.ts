@@ -12,6 +12,7 @@ export interface UpdaterManifestOptions {
   repo: string;
   out: string;
   warn?: (message: string) => void;
+  requireAll?: boolean;
 }
 
 interface PlatformUpdate {
@@ -37,17 +38,24 @@ export function buildUpdaterManifest(options: UpdaterManifestOptions): UpdaterMa
   const dir = resolve(options.dir);
   const warn = options.warn ?? console.warn;
   const platforms: Record<string, PlatformUpdate> = {};
+  const missing: string[] = [];
   for (const [platform, suffix] of Object.entries(platformFiles)) {
     const base = `OpenCodex-${options.version}-${suffix}`;
     const signaturePath = join(dir, `${base}.sig`);
     if (!existsSync(signaturePath)) {
-      warn(`Skipping ${platform}: missing ${signaturePath}`);
+      missing.push(platform);
+      if (!options.requireAll) {
+        warn(`Skipping ${platform}: missing ${signaturePath}`);
+      }
       continue;
     }
     platforms[platform] = {
       signature: readFileSync(signaturePath, "utf8").trim(),
       url: `https://github.com/${options.repo}/releases/download/v${options.version}/${base}`,
     };
+  }
+  if (options.requireAll && missing.length > 0) {
+    throw new Error(`Missing signed updater platforms: ${missing.join(", ")}`);
   }
   if (Object.keys(platforms).length === 0) {
     throw new Error("No signed updater platforms remain");
@@ -79,9 +87,12 @@ if (import.meta.main) {
   const dir = argument("--dir");
   const repo = argument("--repo");
   const out = argument("--out");
+  const requireAll = Bun.argv.includes("--require-all");
   if (!version || !dir || !repo || !out) {
-    throw new Error("Usage: updater-manifest.ts --version <version> --dir <dir> --repo <owner/name> --out <file>");
+    throw new Error(
+      "Usage: updater-manifest.ts --version <version> --dir <dir> --repo <owner/name> --out <file> [--require-all]",
+    );
   }
-  writeUpdaterManifest({ version, dir, repo, out });
+  writeUpdaterManifest({ version, dir, repo, out, requireAll });
   console.log(`Wrote ${out}`);
 }

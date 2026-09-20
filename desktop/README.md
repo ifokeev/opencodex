@@ -31,7 +31,8 @@ bunx tauri build
 The release workflow builds a macOS DMG, Windows MSI, Linux AppImage, and Debian package.
 It collects the platform artifacts beside checksum files and creates `latest.json` for the
 Tauri updater. The public updater key and endpoint live in `src-tauri/tauri.conf.json`;
-the private key must never be committed.
+the private key must never be committed. The manifest is generated only when the updater
+key secret is configured and then requires all four platforms to be signed.
 
 To package locally:
 

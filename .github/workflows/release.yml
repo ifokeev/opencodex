@@ -279,6 +279,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [publish, package-standalone, package-desktop]
     if: ${{ inputs.dry-run != true }}
+    env:
+      UPDATER_SIGNING_CONFIGURED: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     timeout-minutes: 10
     permissions:
       contents: write
@@ -305,10 +307,10 @@ jobs:
           merge-multiple: true
           path: dist/release
 
-      # Fails when no signed updater artifact exists (no TAURI_SIGNING_PRIVATE_KEY);
-      # the unsigned assets still attach, only latest.json is skipped.
+      # Generate latest.json only when the updater key is configured; then require
+      # signatures for all four updater platforms before publishing it.
       - name: Generate updater manifest
-        continue-on-error: true
+        if: env.UPDATER_SIGNING_CONFIGURED == 'true'
         env:
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
@@ -316,7 +318,8 @@ jobs:
             --version "$RELEASE_VERSION" \
             --dir dist/release \
             --repo lidge-jun/opencodex \
-            --out dist/release/latest.json
+            --out dist/release/latest.json \
+            --require-all
 
       - name: Verify the checksum before uploading
         run: |

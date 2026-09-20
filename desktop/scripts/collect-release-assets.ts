@@ -49,10 +49,12 @@ function findBundle(directory: string, kind: BundleKind): string {
     throw new Error(`Missing ${kind} bundle directory: ${directory}`);
   }
   const artifact = readdirSync(directory)
-    .filter(name => name.toLowerCase().endsWith(`.${kind.toLowerCase()}`))
-    .sort()[0];
-  if (!artifact) throw new Error(`No ${kind} bundle found in ${directory}`);
-  return join(directory, artifact);
+    .filter(name => name.toLowerCase().endsWith(`.${kind.toLowerCase()}`));
+  if (artifact.length === 0) throw new Error(`No ${kind} bundle found in ${directory}`);
+  if (artifact.length > 1) {
+    throw new Error(`Multiple ${kind} bundles found in ${directory}: ${artifact.join(", ")}`);
+  }
+  return join(directory, artifact[0]);
 }
 
 export function collectReleaseAssets(options: CollectReleaseAssetsOptions): string[] {
