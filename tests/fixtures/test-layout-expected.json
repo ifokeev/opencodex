@@ -1411,5 +1411,6 @@
   "api-key-model-scope.test.ts": "server",
   "api-key-scope-images.test.ts": "server",
   "api-key-scope-audio.test.ts": "server",
-  "api-key-scope-live.test.ts": "server"
+  "api-key-scope-live.test.ts": "server",
+  "api-key-scope-alpha-search.test.ts": "server"
 }
