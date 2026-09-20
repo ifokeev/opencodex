@@ -110,9 +110,100 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  package-standalone:
+    needs: validate-dispatch
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: bun-linux-x64
+          - os: macos-latest
+            target: bun-darwin-arm64
+          - os: windows-latest
+            target: bun-windows-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup project Bun
+        uses: ./.github/actions/setup-project-bun
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build dashboard
+        run: bun run build:gui
+
+      - name: Build standalone binary
+        run: bun run build:standalone --target ${{ matrix.target }}
+
+      - name: Smoke test standalone binary
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="dist/standalone/${{ matrix.target }}/ocx"
+          "$binary" --version
+          OPENCODEX_HOME="$RUNNER_TEMP/ocx-home" "$binary" start --port 10177 >"$RUNNER_TEMP/ocx.log" 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:10177/healthz && break || sleep 1; done
+          curl -fsS http://127.0.0.1:10177/healthz
+
+      - name: Smoke test standalone binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $binary = "dist/standalone/${{ matrix.target }}/ocx.exe"
+          & $binary --version
+          $env:OPENCODEX_HOME = Join-Path $env:RUNNER_TEMP "ocx-home"
+          $process = Start-Process -FilePath $binary -ArgumentList "start", "--port", "10177" -PassThru
+          try {
+            for ($i = 0; $i -lt 30; $i++) {
+              try { Invoke-WebRequest -UseBasicParsing http://127.0.0.1:10177/healthz | Out-Null; break } catch { Start-Sleep -Seconds 1 }
+            }
+            Invoke-WebRequest -UseBasicParsing http://127.0.0.1:10177/healthz | Select-Object -ExpandProperty Content
+          } finally { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+
+      - name: Archive standalone release
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          STANDALONE_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          cd "dist/standalone/$STANDALONE_TARGET"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            powershell -NoProfile -Command 'Compress-Archive -Path ocx.exe,gui -DestinationPath ("../../ocx-{0}-{1}.zip" -f $env:RELEASE_VERSION,$env:STANDALONE_TARGET) -Force'
+          else
+            tar -czf "../../ocx-${RELEASE_VERSION}-${STANDALONE_TARGET}.tar.gz" ocx gui
+          fi
+          cd ../../..
+          if [[ "$RUNNER_OS" == "Windows" ]]; then sha256sum "dist/ocx-${RELEASE_VERSION}-${STANDALONE_TARGET}.zip" > "dist/ocx-${RELEASE_VERSION}-${STANDALONE_TARGET}.sha256"
+          else sha256sum "dist/ocx-${RELEASE_VERSION}-${STANDALONE_TARGET}.tar.gz" > "dist/ocx-${RELEASE_VERSION}-${STANDALONE_TARGET}.sha256"
+          fi
+
+      - name: Upload standalone release
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: standalone-${{ matrix.target }}
+          path: |
+            dist/ocx-*.tar.gz
+            dist/ocx-*.zip
+            dist/ocx-*.sha256
+          if-no-files-found: error
+          retention-days: 7
+
   attach-macos:
     runs-on: ubuntu-latest
-    needs: [publish, package-macos]
+    needs: [publish, package-macos, package-standalone]
     if: ${{ inputs.dry-run != true }}
     timeout-minutes: 10
     permissions:
@@ -121,7 +212,8 @@ jobs:
       - name: Download the packaged asset
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: macos-release
+          pattern: "*"
+          merge-multiple: true
           path: dist/release
 
       - name: Verify the checksum before uploading
