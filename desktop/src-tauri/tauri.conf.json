@@ -15,6 +15,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "externalBin": ["binaries/ocx"],
     "resources": {
       "resources/gui/dist": "gui/dist"
@@ -28,12 +29,41 @@
       "minimumSystemVersion": "13.0",
       "files": {
         "PlugIns/OpenCodexWidget.appex": "widget/OpenCodexWidget.appex"
+      },
+      "dmg": {
+        "appPosition": {
+          "x": 180,
+          "y": 170
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 170
+        }
       }
     },
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
+      },
+      "wix": {
+        "language": "en-US"
       }
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcxRDdFOTFGNUFGNUQ4RjkKUldUNTJQVmFIK25YY2Z1RGdOUlJtcDZzNWprUG1FakVySHU4aExMc0pDeWlqblgyTE56SUp3NDkK",
+      "endpoints": [
+        "https://github.com/lidge-jun/opencodex/releases/latest/download/latest.json"
+      ]
     }
   }
 }

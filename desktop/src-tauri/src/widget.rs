@@ -7,10 +7,8 @@ mod macos {
     use serde::Serialize;
     use serde_json::{json, Value};
     use std::{
-        collections::HashSet,
         fs,
         path::PathBuf,
-        sync::{Mutex, OnceLock},
         time::{SystemTime, UNIX_EPOCH},
     };
     use uuid::Uuid;
@@ -255,16 +253,6 @@ mod macos {
             .as_secs_f64()
     }
 
-    fn log_once(kind: &str, message: &str) {
-        static LOGGED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-        let logged = LOGGED.get_or_init(|| Mutex::new(HashSet::new()));
-        if let Ok(mut logged) = logged.lock() {
-            if logged.insert(kind.to_owned()) {
-                eprintln!("widget snapshot {kind} failed: {message}");
-            }
-        }
-    }
-
     fn without_generated_at(snapshot: &Snapshot) -> Snapshot {
         let mut snapshot = snapshot.clone();
         snapshot.generated_at = 0.0;
@@ -368,9 +356,9 @@ mod macos {
                     .ok()
                     .and_then(|bytes| serde_json::from_slice::<Snapshot>(&bytes).ok());
                 if let Err(error) = write_if_changed(&path, previous.as_ref(), &snapshot) {
-                    log_once("write", &error.to_string());
+                    crate::logging::log_once("widget snapshot write failed", &error.to_string());
                 }
-                log_once("health", state);
+                crate::logging::log_once("widget snapshot health failed", state);
                 return;
             }
         };
@@ -394,7 +382,7 @@ mod macos {
             .ok()
             .and_then(|bytes| serde_json::from_slice::<Snapshot>(&bytes).ok());
         if let Err(error) = write_if_changed(&path, previous.as_ref(), &snapshot) {
-            log_once("write", &error.to_string());
+            crate::logging::log_once("widget snapshot write failed", &error.to_string());
         }
     }
 

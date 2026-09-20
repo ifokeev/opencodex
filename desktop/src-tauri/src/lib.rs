@@ -1,9 +1,11 @@
 mod auth;
 mod discovery;
 mod formatting;
+mod logging;
 mod proxy;
 mod sidecar;
 mod tray;
+mod updater;
 mod widget;
 mod window;
 
@@ -56,11 +58,13 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             None,
         ))
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![show_dashboard, hide_dashboard])
         .setup(|app| {
             let (endpoint, home) = discovery::current();
@@ -77,6 +81,8 @@ pub fn run() {
                 spawned_by_us: AtomicBool::new(child.is_some()),
                 child: Mutex::new(child),
             });
+            app.manage(updater::PendingUpdate(Mutex::new(None)));
+            app.manage(tray::TrayState::default());
 
             let window = WebviewWindowBuilder::new(
                 app,
@@ -96,6 +102,9 @@ pub fn run() {
                 let _ = window.eval(format!("window.location.replace({dashboard:?})"));
             }
             tray::install(app.handle(), proxy)?;
+            if !cfg!(debug_assertions) {
+                updater::start_background_checks(app.handle().clone());
+            }
             Ok(())
         })
         .build(tauri::generate_context!())

@@ -1,6 +1,6 @@
-use crate::{formatting, proxy::ProxyClient, widget, window};
+use crate::{formatting, proxy::ProxyClient, updater, widget, window};
 use serde_json::Value;
-use std::sync::atomic::Ordering;
+use std::sync::{atomic::Ordering, Mutex};
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -8,6 +8,19 @@ use tauri::{
 };
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
+
+pub struct TrayState(pub Mutex<Option<UpdateMenu>>);
+
+pub struct UpdateMenu {
+    check_updates: MenuItem<Wry>,
+    install_update: MenuItem<Wry>,
+}
+
+impl Default for TrayState {
+    fn default() -> Self {
+        Self(Mutex::new(None))
+    }
+}
 
 pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open-dashboard", "Open Dashboard", true, None::<&str>)?;
@@ -26,6 +39,15 @@ pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
         .load(Ordering::Relaxed);
     let stop = MenuItem::with_id(app, "stop-proxy", "Stop proxy", spawned_by_us, None::<&str>)?;
     let stop_item = stop.clone();
+    let check_updates = MenuItem::with_id(
+        app,
+        "check-updates",
+        "Check for Updates…",
+        true,
+        None::<&str>,
+    )?;
+    let install_update =
+        MenuItem::with_id(app, "install-update", "Install update", false, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(
         app,
@@ -36,9 +58,18 @@ pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
             &login,
             &stop,
             &PredefinedMenuItem::separator(app)?,
+            &check_updates,
+            &install_update,
+            &PredefinedMenuItem::separator(app)?,
             &quit,
         ],
     )?;
+    if let Ok(mut state) = app.state::<TrayState>().0.lock() {
+        *state = Some(UpdateMenu {
+            check_updates: check_updates.clone(),
+            install_update: install_update.clone(),
+        });
+    }
 
     let tray = TrayIconBuilder::with_id("main")
         .icon(icon())
@@ -56,48 +87,71 @@ pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
                 }
             }
         })
-        .on_menu_event(move |app, event| {
-            let Some(window) = app.get_webview_window("main") else {
-                return;
-            };
-            match event.id().as_ref() {
-                "open-dashboard" => window::show(&window),
-                "open-browser" => {
-                    let endpoint = app.state::<crate::AppState>().proxy.endpoint();
-                    let _ = app
-                        .opener()
-                        .open_url(format!("{}#/usage", endpoint.url("/")), None::<String>);
+        .on_menu_event(move |app, event| match event.id().as_ref() {
+            "open-dashboard" => {
+                if let Some(window) = app.get_webview_window("main") {
+                    window::show(&window);
                 }
-                "start-at-login" => {
-                    let enabled = app.autolaunch().is_enabled().unwrap_or(false);
-                    if enabled {
-                        let _ = app.autolaunch().disable();
-                    } else {
-                        let _ = app.autolaunch().enable();
-                    }
-                }
-                "stop-proxy" => {
-                    if app
-                        .state::<crate::AppState>()
-                        .spawned_by_us
-                        .load(Ordering::Relaxed)
-                    {
-                        let proxy = app.state::<crate::AppState>().proxy.clone();
-                        let app = app.clone();
-                        let stop_item = stop_item.clone();
-                        tauri::async_runtime::spawn(async move {
-                            let stopped =
-                                proxy.stop().await.is_ok() || proxy.is_alive().await.is_err();
-                            if stopped {
-                                app.state::<crate::AppState>().shutdown_child();
-                                let _ = stop_item.set_enabled(false);
-                            }
-                        });
-                    }
-                }
-                "quit" => app.exit(0),
-                _ => {}
             }
+            "open-browser" => {
+                let endpoint = app.state::<crate::AppState>().proxy.endpoint();
+                let _ = app
+                    .opener()
+                    .open_url(format!("{}#/usage", endpoint.url("/")), None::<String>);
+            }
+            "start-at-login" => {
+                let enabled = app.autolaunch().is_enabled().unwrap_or(false);
+                if enabled {
+                    let _ = app.autolaunch().disable();
+                } else {
+                    let _ = app.autolaunch().enable();
+                }
+            }
+            "stop-proxy" => {
+                if app
+                    .state::<crate::AppState>()
+                    .spawned_by_us
+                    .load(Ordering::Relaxed)
+                {
+                    let proxy = app.state::<crate::AppState>().proxy.clone();
+                    let app = app.clone();
+                    let stop_item = stop_item.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let stopped = proxy.stop().await.is_ok() || proxy.is_alive().await.is_err();
+                        if stopped {
+                            app.state::<crate::AppState>().shutdown_child();
+                            let _ = stop_item.set_enabled(false);
+                        }
+                    });
+                }
+            }
+            "check-updates" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    updater::check_and_show(&app).await;
+                });
+            }
+            "install-update" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let update = app
+                        .state::<crate::updater::PendingUpdate>()
+                        .0
+                        .lock()
+                        .ok()
+                        .and_then(|pending| pending.clone());
+                    let Some(update) = update else {
+                        return;
+                    };
+                    let version = update.version.clone();
+                    if let Err(error) = updater::install(&app, update).await {
+                        crate::logging::log_once("updater install failed", &error);
+                        show_update_available(&app, &version);
+                    }
+                });
+            }
+            "quit" => app.exit(0),
+            _ => {}
         })
         .build(app)?;
 
@@ -116,6 +170,33 @@ pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
         }
     });
     Ok(())
+}
+
+pub fn show_update_available(app: &AppHandle, version: &str) {
+    if let Some(state) = app.try_state::<TrayState>() {
+        if let Ok(menu) = state.0.lock() {
+            if let Some(menu) = menu.as_ref() {
+                let _ = menu.install_update.set_text(updater::update_label(version));
+                let _ = menu.install_update.set_enabled(true);
+                let _ = menu.check_updates.set_enabled(true);
+                let _ = menu.check_updates.set_text("Check for Updates…");
+            }
+        }
+    }
+}
+
+pub fn show_up_to_date(app: &AppHandle) {
+    if let Some(state) = app.try_state::<TrayState>() {
+        if let Ok(menu) = state.0.lock() {
+            if let Some(menu) = menu.as_ref() {
+                let _ = menu
+                    .check_updates
+                    .set_text(format!("Up to date (v{})", env!("CARGO_PKG_VERSION")));
+                let _ = menu.check_updates.set_enabled(true);
+                let _ = menu.install_update.set_enabled(false);
+            }
+        }
+    }
 }
 
 fn refresh_title(tray: &tauri::tray::TrayIcon<Wry>, proxy: &ProxyClient) {
