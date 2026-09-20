@@ -78,6 +78,8 @@ by the provider.
 
 By default, the menu bar headline shows total tokens; change the headline metric in the
 dashboard Usage companion settings when you prefer requests, cost, quota, or an icon only.
+On macOS 26, the popover and widgets adopt Liquid Glass; earlier macOS versions use the
+standard popover material.
 
 **Quotas** — one row per provider, showing the window under the most pressure. A
 provider at 99% of a five-hour limit and 10% of its monthly limit shows the five-hour

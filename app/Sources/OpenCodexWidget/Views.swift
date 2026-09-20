@@ -6,6 +6,7 @@ import MenuBarCore
 struct OpenCodexWidgetView: View {
     let entry: SnapshotEntry
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
 
     var body: some View {
         Group {
@@ -59,6 +60,7 @@ struct OpenCodexWidgetView: View {
             Text(Format.count(snapshot.today?.requests))
                 .font(.system(size: 28, weight: .semibold, design: .rounded))
                 .lineLimit(1)
+                .widgetAccentable()
             Text("requests today").font(.caption).foregroundStyle(.secondary)
             HStack(spacing: 4) {
                 Text(Format.tokens(snapshot.today?.totalTokens))
@@ -90,7 +92,7 @@ struct OpenCodexWidgetView: View {
             } else if let chart = snapshot.chart {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Last \(windowLabel(chart))").font(.caption).foregroundStyle(.secondary)
-                    chartView(chart, flexible: false)
+                    chartView(chart, flexible: false).widgetAccentable()
                 }
             } else {
                 VStack(alignment: .leading, spacing: 4) {
@@ -119,6 +121,7 @@ struct OpenCodexWidgetView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 chartView(chart, flexible: true)
                     .frame(maxHeight: .infinity)
+                    .widgetAccentable()
                 legend(chart)
             }
             updated(snapshot)
@@ -262,7 +265,10 @@ struct OpenCodexWidgetView: View {
     ]
 
     private func seriesColor(_ index: Int) -> Color {
-        palette[index % palette.count]
+        if renderingMode == .accented {
+            return .primary.opacity([1, 0.8, 0.6, 0.45, 0.3, 0.2][index % 6])
+        }
+        return palette[index % palette.count]
     }
 
     private func windowLabel(_ chart: WidgetSnapshot.Chart) -> String {

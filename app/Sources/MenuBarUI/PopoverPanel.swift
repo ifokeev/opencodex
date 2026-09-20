@@ -43,31 +43,7 @@ public final class PopoverPanel: NSPanel {
     public override var contentViewController: NSViewController? {
         didSet {
             guard let content = contentViewController?.view else { return }
-            let effect = NSVisualEffectView()
-            effect.material = .popover
-            effect.blendingMode = .behindWindow
-            effect.state = .active
-            effect.wantsLayer = true
-            effect.layer?.cornerRadius = 10
-            effect.layer?.masksToBounds = true
-            effect.translatesAutoresizingMaskIntoConstraints = false
-
-            let host = NSView()
-            host.addSubview(effect)
-            effect.addSubview(content)
-            content.translatesAutoresizingMaskIntoConstraints = false
-
-            NSLayoutConstraint.activate([
-                effect.topAnchor.constraint(equalTo: host.topAnchor),
-                effect.leadingAnchor.constraint(equalTo: host.leadingAnchor),
-                effect.trailingAnchor.constraint(equalTo: host.trailingAnchor),
-                effect.bottomAnchor.constraint(equalTo: host.bottomAnchor),
-                content.topAnchor.constraint(equalTo: effect.topAnchor),
-                content.leadingAnchor.constraint(equalTo: effect.leadingAnchor),
-                content.trailingAnchor.constraint(equalTo: effect.trailingAnchor),
-                content.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
-            ])
-            contentView = host
+            contentView = PopoverSurface.make(content: content)
         }
     }
 
@@ -143,5 +119,44 @@ public final class PopoverPanel: NSPanel {
 
     private func layoutContent() {
         contentViewController?.view.layoutSubtreeIfNeeded()
+    }
+}
+
+private enum PopoverSurface {
+    static func make(content: NSView) -> NSView {
+        let surface: NSView
+        if #available(macOS 26, *) {
+            let glass = NSGlassEffectView()
+            glass.cornerRadius = 16
+            glass.style = .regular
+            glass.contentView = content
+            surface = glass
+        } else {
+            let effect = NSVisualEffectView()
+            effect.material = .popover
+            effect.blendingMode = .behindWindow
+            effect.state = .active
+            effect.wantsLayer = true
+            effect.layer?.cornerRadius = 10
+            effect.layer?.masksToBounds = true
+            effect.addSubview(content)
+            surface = effect
+        }
+
+        let host = NSView()
+        host.addSubview(surface)
+        surface.translatesAutoresizingMaskIntoConstraints = false
+        content.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            surface.topAnchor.constraint(equalTo: host.topAnchor),
+            surface.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+            surface.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+            surface.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+            content.topAnchor.constraint(equalTo: surface.topAnchor),
+            content.leadingAnchor.constraint(equalTo: surface.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: surface.trailingAnchor),
+            content.bottomAnchor.constraint(equalTo: surface.bottomAnchor),
+        ])
+        return host
     }
 }
