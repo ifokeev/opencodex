@@ -1,6 +1,5 @@
+use crate::discovery::ProxyEndpoint;
 use tauri::{AppHandle, Manager, Url, WebviewWindow, WindowEvent};
-
-const LOOPBACK_PREFIX: &str = "http://127.0.0.1:";
 
 pub fn configure(window: &WebviewWindow) {
     let window_for_close = window.clone();
@@ -13,16 +12,20 @@ pub fn configure(window: &WebviewWindow) {
     });
 }
 
-pub fn navigation_allowed(url: &Url) -> bool {
-    let value = url.as_str();
-    if value.starts_with(LOOPBACK_PREFIX) || value.starts_with("tauri://") {
-        return true;
+pub fn navigation_allowed(endpoint: ProxyEndpoint) -> impl Fn(&Url) -> bool {
+    move |url| {
+        if url.scheme() == "tauri" {
+            return true;
+        }
+        if url.scheme() == "http" && url.host_str() == Some(endpoint.host) {
+            return url.port_or_known_default() == Some(endpoint.port);
+        }
+        if matches!(url.scheme(), "http" | "https") {
+            let _ = tauri_plugin_opener::open_url(url.as_str(), None::<&str>);
+            return false;
+        }
+        url.scheme() == "about" && url.as_str() == "about:blank"
     }
-    if value.starts_with("http://") || value.starts_with("https://") {
-        let _ = tauri_plugin_opener::open_url(value, None::<&str>);
-        return false;
-    }
-    true
 }
 
 pub fn show(window: &WebviewWindow) {

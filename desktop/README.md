@@ -10,3 +10,8 @@ bun run dev
 
 The sidecar is generated from the repository's standalone binary build and is
 not checked into git.
+
+The CI desktop-shell job performs Rust-only checks. It creates an empty
+platform-named sidecar stub and a placeholder dashboard resource directory
+solely for Tauri's external-binary and resource validation; it does not build
+or run the standalone binary.

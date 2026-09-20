@@ -5,8 +5,8 @@ discovers the loopback proxy, lazily retries management authentication, starts
 the bundled `ocx` sidecar only when the configured endpoint is unreachable,
 and owns the tray, autostart, single-instance, and window lifecycle behavior.
 
-`desktop/ui/` is only a short bootstrap page. Once `/api/startup-health`
-answers, the shell navigates the webview to the proxy's loopback dashboard
+`desktop/ui/` is only a short bootstrap page. Once `/healthz` answers, the shell
+navigates the webview to the proxy's loopback dashboard
 (`/#/usage`) rather than bundling or serving `gui/dist` itself.
 
 `desktop/scripts/prepare-sidecar.ts` maps Rust target triples to the standalone

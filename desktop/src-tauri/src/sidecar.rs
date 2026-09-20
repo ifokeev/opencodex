@@ -42,5 +42,6 @@ pub async fn ensure_proxy(
             return Ok(Some(child));
         }
     }
+    let _ = child.kill();
     Err("the OpenCodex sidecar did not become healthy".into())
 }

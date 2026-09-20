@@ -20,6 +20,19 @@ pub struct AppState {
     pub child: Mutex<Option<CommandChild>>,
 }
 
+impl AppState {
+    pub fn shutdown_child(&self) {
+        if !self.spawned_by_us.swap(false, Ordering::AcqRel) {
+            return;
+        }
+        if let Ok(mut child) = self.child.lock() {
+            if let Some(child) = child.take() {
+                let _ = child.kill();
+            }
+        }
+    }
+}
+
 #[tauri::command]
 fn show_dashboard(app: tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -72,7 +85,7 @@ pub fn run() {
             .title("OpenCodex")
             .inner_size(1100.0, 720.0)
             .visible(false)
-            .on_navigation(window::navigation_allowed)
+            .on_navigation(window::navigation_allowed(endpoint))
             .build()?;
             window::configure(&window);
             window::set_tray_policy(app.handle(), false);
@@ -83,19 +96,13 @@ pub fn run() {
             tray::install(app.handle(), proxy)?;
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Destroyed = event {
-                if let Some(state) = window.app_handle().try_state::<AppState>() {
-                    if state.spawned_by_us.load(Ordering::Relaxed) {
-                        if let Ok(mut child) = state.child.lock() {
-                            if let Some(child) = child.take() {
-                                let _ = child.kill();
-                            }
-                        }
-                    }
+        .build(tauri::generate_context!())
+        .expect("error while building OpenCodex desktop shell")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                if let Some(state) = app.try_state::<AppState>() {
+                    state.shutdown_child();
                 }
             }
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running OpenCodex desktop shell");
+        });
 }

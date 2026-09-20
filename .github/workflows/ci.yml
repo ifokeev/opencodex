@@ -1200,6 +1200,15 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
+      - name: Prepare desktop check resources
+        run: |
+          set -euo pipefail
+          triple="$(rustc -vV | sed -n 's/^host: //p')"
+          mkdir -p desktop/src-tauri/binaries desktop/src-tauri/resources/gui/dist
+          : > "desktop/src-tauri/binaries/ocx-${triple}"
+          chmod +x "desktop/src-tauri/binaries/ocx-${triple}"
+          : > desktop/src-tauri/resources/gui/dist/.keep
+
       - name: Check Rust formatting
         run: cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check
 
