@@ -13,16 +13,20 @@ import { withUpstreamHttpVersion } from "../../lib/upstream-http-version";
 import type { CodexWsQuotaObserver } from "./codex-ws-metadata";
 import { configuredOutboundFetch } from "../../lib/proxy-env";
 import {
-  InvalidProviderEgressError,
   describeProviderEgressForLog,
-  providerEgressFetchInit,
+  markEgressTransparentExecutor,
+  providerEgressSendInit,
   providerEgressIsExplicit,
   resolveProviderEgress,
+  type ProviderEgressBinding,
 } from "../../lib/provider-egress";
+import { redactSecretString } from "../../lib/redact";
 
 export { withUpstreamHttpVersion };
 
 const egressWebsocketDowngradeWarned = new Set<string>();
+/** A provider name is configuration-controlled, so the notice set is bounded like any cache. */
+const EGRESS_DOWNGRADE_NOTICE_LIMIT = 64;
 
 /**
  * Announce once, per provider, that an explicit egress route moved this provider off the
@@ -36,9 +40,12 @@ const egressWebsocketDowngradeWarned = new Set<string>();
  */
 function warnEgressWebsocketDowngradeOnce(providerName: string, egress: string): void {
   if (egressWebsocketDowngradeWarned.has(providerName)) return;
+  if (egressWebsocketDowngradeWarned.size >= EGRESS_DOWNGRADE_NOTICE_LIMIT) return;
   egressWebsocketDowngradeWarned.add(providerName);
   console.warn(
-    `[opencodex] provider "${providerName}" declares egress ${egress}; the WebSocket upstream `
+    // The name is caller-controlled and can be token-shaped, so it is redacted and JSON-escaped
+    // before it reaches a log, exactly as at the management error boundary.
+    `[opencodex] provider ${JSON.stringify(redactSecretString(providerName))} declares egress ${egress}; the WebSocket upstream `
     + "selects its proxy from the process environment and cannot carry a per-provider route, "
     + "so these turns are served over HTTP/SSE.",
   );
@@ -131,17 +138,24 @@ export function sendWithConnectionPolicy(
   physicalFetch: typeof globalThis.fetch,
   input: Parameters<typeof globalThis.fetch>[0],
   init?: RequestInit,
+  egress?: ProviderEgressBinding,
 ): Promise<Response> {
   const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
   const fresh = wantsFreshConnection(input);
   if (fresh) {
     headers.set("Connection", "close");
   }
+  // Decided here, against the destination this send is actually going to, and around whichever
+  // executor was just selected. A `dispatchOverride` that rebuilds a queued request can change
+  // both the upstream host and the provider transport after the wrapper was constructed, so a
+  // route resolved at construction could be applied to a different host than it was decided for.
+  const egressInit = egress ? providerEgressSendInit(egress, physicalFetch, input) : {};
   return physicalFetch(input, {
     ...init,
     headers,
     redirect: "manual",
     ...(fresh ? { keepalive: false } : {}),
+    ...egressInit,
   });
 }
 
@@ -166,19 +180,23 @@ export function providerFetch(
 ): ProviderFetch {
   const providerName = options.providerName ?? "<unnamed provider>";
   const customExecutor = (provider as OcxProviderConfig & { fetch?: typeof globalThis.fetch }).fetch;
+  // The route is applied at the physical send (see `sendWithConnectionPolicy`). This binding is
+  // only what that boundary needs to decide it.
+  const egressBinding: ProviderEgressBinding = { providerName, provider };
   // Resolved per request, not once per wrapper: `providers.<name>.noProxy` is evaluated against
   // the destination, so two requests through the same executor can legitimately take different
-  // routes. A malformed value throws here and rejects the request rather than degrading to the
+  // routes. A malformed value throws and rejects the request rather than degrading to the
   // global proxy or to direct, either of which would read as success at the call site.
   const egressFor = (input: Parameters<typeof globalThis.fetch>[0]) => resolveProviderEgress({
     providerName,
     provider,
     url: typeof input === "string" ? input : input instanceof URL ? input : input.url,
   });
-  const configuredFetch = Object.assign(
+  // The built-in executor forwards its init to a transport that honours the proxy option.
+  const configuredFetch = markEgressTransparentExecutor(Object.assign(
     (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => configuredOutboundFetch(input, init),
     { preconnect: globalThis.fetch.preconnect?.bind(globalThis.fetch) },
-  ) as typeof globalThis.fetch;
+  ) as typeof globalThis.fetch);
   const base = customExecutor ?? configuredFetch;
   const preconnect = (...args: Parameters<typeof globalThis.fetch.preconnect>): void => {
     base.preconnect?.(...args);
@@ -187,32 +205,19 @@ export function providerFetch(
   // Return the original 3xx so the response owner retains its retry/health/relay contract.
   const dispatch = Object.assign(
     (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) =>
-      sendWithConnectionPolicy(base, input, init),
+      sendWithConnectionPolicy(base, input, init, egressBinding),
     { preconnect },
   ) as typeof globalThis.fetch;
   const httpFetch = Object.assign(
     async (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => {
-      const egress = egressFor(input);
-      if (providerEgressIsExplicit(egress) && customExecutor) {
-        // Same refusal as the outbound transport: an executor the caller supplied owns its own
-        // routing, so the configured route cannot be honoured and must not be ignored either.
-        throw new InvalidProviderEgressError(
-          "proxy",
-          "a caller-supplied fetch executor owns its own routing, so this route cannot be applied",
-          `providers.${providerName}.proxy cannot be applied to a caller-supplied fetch executor; `
-          + "remove the provider egress override or the custom executor",
-        );
-      }
       // The hook inspects the outgoing headers and refuses the send by throwing; it is not a
       // mutator, and the copy it receives is deliberately not threaded onward. `Connection`
       // is decided inside `dispatch`, which runs after this, so the fresh-connection policy
       // wins regardless of what any caller or hook put in the header.
       options.beforeDispatch?.(new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined)));
-      const dispatchInit = {
-        ...withUpstreamHttpVersion(input, init, provider),
-        timeout: 0,
-        ...providerEgressFetchInit(egress),
-      };
+      // No proxy option is attached here: a `dispatchOverride` may rebuild this request against
+      // a different destination, so the route is decided at the physical send instead.
+      const dispatchInit = { ...withUpstreamHttpVersion(input, init, provider), timeout: 0 };
       return options.dispatchOverride
         ? options.dispatchOverride(input, dispatchInit, dispatch)
         : dispatch(input, dispatchInit);
@@ -253,11 +258,16 @@ export function providerFetch(
     await waitForPacing(init?.signal ?? undefined);
     return unpaced(input, init);
   };
-  return Object.assign(wrapped, {
+  // The returned wrapper forwards its init down to `dispatch`, which applies the route at the
+  // physical send. Adapters that hand this executor back as `provider.fetch` (Cursor does)
+  // therefore still carry a per-provider route instead of being refused as opaque.
+  const paceAware = Object.assign(wrapped, {
     preconnect,
     waitForPacing,
     unpacedFetch: Object.assign(unpaced, { preconnect }),
   });
+  markEgressTransparentExecutor(paceAware as unknown as typeof globalThis.fetch);
+  return paceAware;
 }
 
 

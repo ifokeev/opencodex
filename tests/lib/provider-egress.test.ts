@@ -163,18 +163,19 @@ describe("direct egress overrides the installed SOCKS transport", () => {
 
   test("an inheriting provider still reaches the global SOCKS transport unchanged", async () => {
     for (const key of proxyKeys) delete process.env[key];
-    // Port 1 is closed, so the SOCKS transport refuses immediately instead of waiting on a
-    // socket. What is asserted is which transport took the request, not that it succeeded.
-    process.env.ALL_PROXY = "socks5://127.0.0.1:1";
+    // Port 0 is rejected by the SOCKS transport's own validation before any socket is opened,
+    // so the outcome does not depend on what happens to be listening on the test host. What is
+    // asserted is which transport took the request, not that it succeeded.
+    process.env.ALL_PROXY = "socks5://127.0.0.1:0";
     const base = mock(async () => new Response(null, { status: 200 }));
     // With no explicit option the SOCKS wrapper owns the request, so the base fetch below is
     // never reached. Asserting that keeps this change from quietly disabling global SOCKS.
-    const attempt = configuredOutboundFetch(
+    const outcome = await configuredOutboundFetch(
       TARGET,
       providerEgressFetchInit(resolve({})) as RequestInit,
       base as unknown as typeof globalThis.fetch,
-    ).catch(() => "socks-transport-attempted");
-    expect(await attempt).toBe("socks-transport-attempted");
+    ).then(() => "base-fetch-used", () => "socks-transport-owned-the-request");
+    expect(outcome).toBe("socks-transport-owned-the-request");
     expect(base).not.toHaveBeenCalled();
   });
 });

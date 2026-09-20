@@ -163,9 +163,12 @@ describe("per-provider egress on the discovery and quota transport", () => {
     const proxied = captureProxiedFetch();
     try {
       await providerOutboundGet("vendor", { baseUrl: "https://provider.example" }, MODELS_URL, {}, dependencies);
-      // Unpinned: the global proxy decision reaches the wire exactly as it did before this
-      // field existed, which is what "inherit" has to mean.
-      expect(proxied.calls).toEqual([undefined]);
+      // The global decision reaches the wire exactly as it did before this field existed,
+      // which is what "inherit" has to mean. That decision already pins the scheme-matched
+      // proxy here — the fake-IP admission binds the transport to the value it assumed rather
+      // than letting fetch re-infer it — so the assertion is that the pin is the GLOBAL proxy
+      // and is unchanged, not that no pin exists.
+      expect(proxied.calls).toEqual([GLOBAL_PROXY]);
     } finally {
       proxied.restore();
     }

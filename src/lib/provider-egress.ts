@@ -208,6 +208,75 @@ export function providerEgressFetchInit(egress: ProviderEgress): { proxy?: strin
 }
 
 /**
+ * Marker for an executor that forwards its `RequestInit` to a transport which honours the
+ * request-scoped proxy option.
+ *
+ * A provider route is refused on an executor that owns its own transport, because applying it
+ * is impossible and ignoring it is worse. But not every `provider.fetch` owns a transport:
+ * some are internal wrappers that add a header and delegate, and `src/providers/xai-transport.ts`
+ * installs exactly such a wrapper on every xAI route. Refusing those would make the per-provider
+ * proxy unusable on one of the two providers the original issue names.
+ *
+ * The marker is opt-in and applied by the wrapper's author, so an executor that arrives from
+ * configuration or from a caller is opaque by default and still refused. `Symbol.for` keeps the
+ * mark readable across duplicated module instances.
+ */
+const EGRESS_TRANSPARENT_EXECUTOR = Symbol.for("opencodex.provider-egress.transparent-executor");
+
+export function markEgressTransparentExecutor<Fetch extends typeof globalThis.fetch>(executor: Fetch): Fetch {
+  (executor as unknown as Record<symbol, boolean>)[EGRESS_TRANSPARENT_EXECUTOR] = true;
+  return executor;
+}
+
+export function isEgressTransparentExecutor(executor: unknown): boolean {
+  return typeof executor === "function"
+    && (executor as unknown as Record<symbol, unknown>)[EGRESS_TRANSPARENT_EXECUTOR] === true;
+}
+
+/** The destination of a fetch input, or null when it cannot be read as a URL. */
+export function egressTargetUrl(input: string | URL | Request): string | null {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return typeof input?.url === "string" ? input.url : null;
+}
+
+/** Everything a physical send needs to decide the route for the request it is about to make. */
+export interface ProviderEgressBinding {
+  providerName: string;
+  provider: Pick<OcxProviderConfig, "proxy" | "noProxy">;
+}
+
+/**
+ * The request options expressing `binding`'s route for the destination actually being sent to.
+ *
+ * Resolved at the physical send rather than when the executor was built, for the reason #4992
+ * already established for the connection policy: a queued request can be rebuilt against a
+ * different upstream host before it leaves, and a route decided against the original
+ * destination would then be applied to a different one. With a host-scoped `noProxy` that
+ * inverts the decision, and the credential leaves by a route the operator did not choose.
+ *
+ * Refuses rather than degrades when the selected executor owns its own transport.
+ */
+export function providerEgressSendInit(
+  binding: ProviderEgressBinding,
+  physicalFetch: unknown,
+  input: string | URL | Request,
+): { proxy?: string | false } {
+  const url = egressTargetUrl(input);
+  if (url === null) return {};
+  const egress = resolveProviderEgress({ providerName: binding.providerName, provider: binding.provider, url });
+  if (providerEgressIsExplicit(egress) && !isEgressTransparentExecutor(physicalFetch)) {
+    throw new InvalidProviderEgressError(
+      "proxy",
+      "the selected transport owns its own routing, so this route cannot be applied",
+      `providers.${binding.providerName}.proxy cannot be applied to the selected provider transport; `
+      + "remove the provider egress override or the custom executor",
+    );
+  }
+  return providerEgressFetchInit(egress);
+}
+
+/**
  * A destination used only to exercise the resolver at configuration time.
  *
  * Validation has no request URL, but `noProxy` is only meaningful against one. Resolving a

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { CODEX_RESPONSES_HTTP_URL } from "../../src/server/responses/codex-ws-request";
 import { MIN_BOUNDED_CODEX_WS_BUN_VERSION } from "../../src/server/responses/ws-upstream";
 import { InvalidProviderEgressError, PROVIDER_EGRESS_DIRECT } from "../../src/lib/provider-egress";
+import { markEgressTransparentExecutor } from "../../src/lib/provider-egress";
 import { __resetEgressWebsocketDowngradeNotices, providerFetch } from "../../src/server/responses/fetch-helpers";
 import { PROXY_ENV_KEYS } from "../../src/lib/proxy-env";
 import type { OcxProviderConfig } from "../../src/types";
@@ -162,5 +163,47 @@ describe("per-provider egress on the inference dispatch", () => {
     } finally {
       captured.restore();
     }
+  });
+
+  test("a rebuilt request resolves its route against the destination it is actually sent to", async () => {
+    // A queued request can be rebuilt at its physical send -- account reselection can move the
+    // upstream host -- so a route decided when the executor was constructed would be applied to
+    // a host it was not decided for. Here the bypass list names only the rebuilt destination:
+    // resolving early would send it through the proxy, and the credential would leave by a
+    // route the operator excluded. The same class as #4992, which is why the decision now sits
+    // at the same boundary as the connection policy.
+    for (const key of proxyKeys) delete process.env[key];
+    const captured = captureDispatch();
+    const rebuiltUrl = "https://internal.example/v1/responses";
+    try {
+      await providerFetch(
+        provider({ proxy: PROVIDER_PROXY, noProxy: "internal.example" }),
+        undefined,
+        {
+          providerName: "vendor",
+          dispatchOverride: (_input, init, execute) => execute(rebuiltUrl, init),
+        },
+      )(TARGET, { method: "POST", body: "{}" });
+      expect(captured.calls).toEqual([{ url: rebuiltUrl, proxy: false }]);
+    } finally {
+      captured.restore();
+    }
+  });
+
+  test("an internal wrapper that forwards its init still carries the route", async () => {
+    // Not every `provider.fetch` owns a transport. The xAI route installs a wrapper that only
+    // adds a header and delegates; refusing those would make the per-provider proxy unusable on
+    // one of the two providers the original issue names. The marker is opt-in, so an executor
+    // arriving from configuration stays opaque and is still refused.
+    for (const key of proxyKeys) delete process.env[key];
+    const seen: Array<unknown> = [];
+    const wrapper = markEgressTransparentExecutor((async (_input: RequestInfo | URL, init?: RequestInit) => {
+      seen.push((init as { proxy?: unknown } | undefined)?.proxy);
+      return new Response(null, { status: 200 });
+    }) as unknown as typeof globalThis.fetch);
+    const configured = provider({ proxy: PROVIDER_PROXY }) as OcxProviderConfig & { fetch?: typeof globalThis.fetch };
+    configured.fetch = wrapper;
+    await providerFetch(configured, undefined, { providerName: "vendor" })(TARGET, { method: "POST", body: "{}" });
+    expect(seen).toEqual([`${PROVIDER_PROXY}/`]);
   });
 });
