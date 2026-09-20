@@ -138,6 +138,13 @@ export interface OcxClaudeCodeConfig {
   /** Compact-window tokens for auto-context. Default 829_800 (AUTO_COMPACT_WINDOW_DEFAULT). */
   autoCompactWindow?: number;
   /**
+   * Local CONNECT proxy + TLS listener that intercepts Claude Code's own `api.anthropic.com`
+   * traffic without any `ANTHROPIC_BASE_URL` rewrite (src/claude/intercept). Claude Code reaches
+   * it via `HTTPS_PROXY`/`NODE_EXTRA_CA_CERTS` in its settings env. Default: enabled on a
+   * hub; the proxy port defaults to the public port + 100.
+   */
+  intercept?: { enabled?: boolean; port?: number };
+  /**
    * Bundled-skill content elision for ROUTED (non-Anthropic) models (devlog 260712
    * 060): Skill-tool results whose skill name matches an entry here are replaced
    * with a short stub in the anthropic->responses translation. Third-party models

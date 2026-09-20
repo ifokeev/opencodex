@@ -203,6 +203,7 @@ import {
 } from "../lib/package-tree-integrity";
 import { detectInstall } from "../update/index";
 import { createServeOptions, type ServerIngress } from "./index/serve-options";
+import { startClaudeIntercept, type ClaudeInterceptHandle } from "../claude/intercept/runtime";
 import { inspectStartupOwnership, setStartupCacheInvalidationWrite, warnAgentTaskRecoveryStartup, warnPlaintextV2AgentMessagesStartup, type StartServerDeps } from "./index/startup-warnings";
 import { acquireSpendLedgerServerLifecycle, type SpendLedgerServerLifecycle } from "./index/spend-ledger-lifecycle";
 
@@ -627,6 +628,8 @@ function startServerWithSpendLedgerOwner(port: number | undefined, deps: StartSe
   let server: Server<WsData>;
   let loopbackServer: Server<WsData> | null = null;
   let managementIngressServer: Server<WsData> | null = null;
+  let claudeInterceptServer: Server<WsData> | null = null;
+  let serveOptions: ReturnType<typeof createServeOptions>;
 
   // Resolved once, before any listener binds. The clamp is silent inside the resolver so it
   // stays pure and per-request cheap; the operator is told here instead, once, because a
@@ -647,6 +650,7 @@ function startServerWithSpendLedgerOwner(port: number | undefined, deps: StartSe
   function ingressForServer(requestServer: Server<WsData>): ServerIngress {
     if (requestServer === loopbackServer) return "unauthenticated-loopback";
     if (requestServer === managementIngressServer) return "hub-management";
+    if (claudeInterceptServer && requestServer === claudeInterceptServer) return "claude-intercept";
     return "public";
   }
   let backgroundLifecycle: ReturnType<typeof acquireServerBackgroundLifecycle> | null = null;
@@ -678,7 +682,7 @@ function startServerWithSpendLedgerOwner(port: number | undefined, deps: StartSe
     // Started inside the guarded startup transaction so the catch below can
     // release the owner-scoped lease on any listener failure.
     userCostOverlayReconciler = startUserCostOverlayReconciler({ liveConfig: config });
-    const serveOptions = createServeOptions({
+    serveOptions = createServeOptions({
       drainingResponse,
       ingressForServer,
       loopbackRouteAllowed,
@@ -757,6 +761,29 @@ function startServerWithSpendLedgerOwner(port: number | undefined, deps: StartSe
   }
 
   bindNativeMainStartupLifecycle(server, nativeMainLifecycle);
+
+  const interceptDispatch = serveOptions;
+  // Claude intercept pair (CONNECT proxy + TLS listener). Optional: a bind failure degrades to
+  // a warning, never to a startup failure, because every other client keeps working without it.
+  const claudeInterceptStart: Promise<ClaudeInterceptHandle<WsData> | null> = startClaudeIntercept<WsData>({
+    config,
+    publicPort: server.port ?? listenPort,
+    maxRequestBodySize: inboundBodyLimitBytes,
+    dispatch: (req, requestServer) => {
+      claudeInterceptServer ??= requestServer;
+      return interceptDispatch.fetch(req, requestServer);
+    },
+  }).then(handle => {
+    if (handle) {
+      claudeInterceptServer = handle.listener;
+      console.log(`🔐 Claude intercept proxy active on http://127.0.0.1:${handle.proxyPort} (CONNECT api.anthropic.com → local TLS)`);
+    }
+    return handle;
+  }).catch((error: unknown) => {
+    console.warn(`⚠ Claude intercept proxy could not start: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  });
+
   const nativeStop = server.stop.bind(server);
   const loopbackListenerRef = loopbackServer;
   const managementIngressRef = managementIngressServer;
@@ -776,6 +803,7 @@ function startServerWithSpendLedgerOwner(port: number | undefined, deps: StartSe
           ...(managementIngressRef
             ? [() => managementIngressRef.stop(closeActiveConnections)]
             : []),
+          async () => { await (await claudeInterceptStart)?.stop(); },
           async () => { await remoteWorkspaceShutdown?.(); },
           async () => {
             try {

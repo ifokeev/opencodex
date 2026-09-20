@@ -1583,7 +1583,11 @@
     "chat-inline-document-bytes.test.ts": "responses",
     "devin-output-budget.test.ts": "providers",
     "api-key-model-scope.test.ts": "server",
-    "docs-provider-discovery-limits.test.ts": "ci-workflows"
+    "docs-provider-discovery-limits.test.ts": "ci-workflows",
+    "claude-intercept-local-ca.test.ts": "claude-integration",
+    "claude-intercept-proxy.test.ts": "claude-integration",
+    "claude-intercept-settings.test.ts": "claude-integration",
+    "claude-intercept-integration.test.ts": "server"
   },
   "migrated": [
     "adapters",
