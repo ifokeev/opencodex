@@ -118,10 +118,19 @@ jobs:
         include:
           - os: ubuntu-latest
             target: bun-linux-x64
+            smoke: true
           - os: macos-latest
             target: bun-darwin-arm64
+            smoke: true
+          - os: macos-latest
+            target: bun-darwin-x64
+            smoke: false
           - os: windows-latest
             target: bun-windows-x64
+            smoke: true
+          - os: ubuntu-latest
+            target: bun-linux-arm64
+            smoke: false
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     permissions:
@@ -145,7 +154,7 @@ jobs:
         run: bun run build:standalone --target ${{ matrix.target }}
 
       - name: Smoke test standalone binary
-        if: runner.os != 'Windows'
+        if: matrix.smoke && runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
@@ -156,9 +165,10 @@ jobs:
           trap 'kill "$pid" 2>/dev/null || true' EXIT
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:10177/healthz && break || sleep 1; done
           curl -fsS http://127.0.0.1:10177/healthz
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:10177/)" = 200
 
       - name: Smoke test standalone binary (Windows)
-        if: runner.os == 'Windows'
+        if: matrix.smoke && runner.os == 'Windows'
         shell: pwsh
         run: |
           $binary = "dist/standalone/${{ matrix.target }}/ocx.exe"
@@ -170,6 +180,7 @@ jobs:
               try { Invoke-WebRequest -UseBasicParsing http://127.0.0.1:10177/healthz | Out-Null; break } catch { Start-Sleep -Seconds 1 }
             }
             Invoke-WebRequest -UseBasicParsing http://127.0.0.1:10177/healthz | Select-Object -ExpandProperty Content
+            Invoke-WebRequest -UseBasicParsing http://127.0.0.1:10177/ | Out-Null
           } finally { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
 
       - name: Archive standalone release
@@ -209,10 +220,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download the packaged asset
+      - name: Download the macOS packaged asset
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: "*"
+          name: macos-release
+          path: dist/release
+
+      - name: Download standalone packaged assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: standalone-*
           merge-multiple: true
           path: dist/release
 
