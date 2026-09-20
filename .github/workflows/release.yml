@@ -171,20 +171,149 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  attach-standalone:
+  package-desktop:
+    needs: validate-dispatch
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: universal-apple-darwin
+            bundles: app,dmg
+            sidecar-targets: macos
+            artifact-suffixes: macos.dmg
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: msi
+            sidecar-targets: x86_64-pc-windows-msvc
+            artifact-suffixes: windows-x64.msi
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: appimage,deb
+            sidecar-targets: x86_64-unknown-linux-gnu
+            artifact-suffixes: linux-x86_64.AppImage,linux-amd64.deb
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup project Bun
+        uses: ./.github/actions/setup-project-bun
+
+      - name: Install project dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build dashboard
+        run: bun run build:gui
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
+        with:
+          toolchain: stable
+
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: bun install --frozen-lockfile
+
+      - name: Prepare macOS sidecars
+        if: runner.os == 'macOS'
+        run: |
+          bun desktop/scripts/prepare-sidecar.ts --target aarch64-apple-darwin
+          bun desktop/scripts/prepare-sidecar.ts --target x86_64-apple-darwin
+
+      - name: Prepare sidecar
+        if: runner.os != 'macOS'
+        run: bun desktop/scripts/prepare-sidecar.ts --target ${{ matrix.sidecar-targets }}
+
+      - name: Build WidgetKit extension
+        if: runner.os == 'macOS'
+        run: bash desktop/scripts/build-widget.sh
+
+      # Release signing is intentionally secret-gated. Developer ID, notarization,
+      # and updater signatures require maintainer-owned credentials; builds without
+      # those secrets remain useful for local validation but are not release assets.
+      - name: Build desktop bundles
+        working-directory: desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: bunx tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+
+      - name: Rename release assets
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          DESKTOP_TARGET: ${{ matrix.target }}
+        run: |
+          bun desktop/scripts/collect-release-assets.ts \
+            --version "$RELEASE_VERSION" \
+            --target "$DESKTOP_TARGET" \
+            --out dist/release
+
+      - name: Upload desktop release
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-${{ matrix.target }}
+          path: dist/release/
+          if-no-files-found: error
+          retention-days: 7
+
+  attach-release:
     runs-on: ubuntu-latest
-    needs: [publish, package-standalone]
+    needs: [publish, package-standalone, package-desktop]
     if: ${{ inputs.dry-run != true }}
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup project Bun
+        uses: ./.github/actions/setup-project-bun
+
       - name: Download standalone packaged assets
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: standalone-*
           merge-multiple: true
           path: dist/release
+
+      - name: Download desktop packaged assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: dist/release
+
+      - name: Generate updater manifest
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          bun desktop/scripts/updater-manifest.ts \
+            --version "$RELEASE_VERSION" \
+            --dir dist/release \
+            --repo lidge-jun/opencodex \
+            --out dist/release/latest.json
 
       - name: Verify the checksum before uploading
         run: |
