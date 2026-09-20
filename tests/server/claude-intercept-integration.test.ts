@@ -107,6 +107,34 @@ test("Messages through CONNECT reach the router; other paths relay to the config
   expect(getClaudeInterceptState()).toBeNull();
 }, SERVER_BUDGET_MS);
 
+test("an ephemeral public port starts no proxy unless intercept.port is explicit", async () => {
+  const base = {
+    hostname: "127.0.0.1",
+    defaultProvider: "chatgpt",
+    providers: {
+      chatgpt: { adapter: "openai-responses", baseUrl: "https://chatgpt.com/backend-api/codex", authMode: "forward" },
+    },
+  };
+  saveConfig({ ...base, port: 10100 } as unknown as OcxConfig);
+  const implicit = startServer(0);
+  try {
+    await Bun.sleep(100);
+    expect(getClaudeInterceptState()).toBeNull();
+  } finally {
+    await implicit.stop(true);
+  }
+
+  const proxyPort = await findAvailablePort(0, "127.0.0.1");
+  saveConfig({ ...base, port: 10100, claudeCode: { intercept: { port: proxyPort } } } as unknown as OcxConfig);
+  const explicit = startServer(0);
+  try {
+    const state = await waitForIntercept();
+    expect(state.proxyPort).toBe(proxyPort);
+  } finally {
+    await explicit.stop(true);
+  }
+}, SERVER_BUDGET_MS);
+
 test("intercept.enabled=false starts no proxy", async () => {
   const publicPort = await findAvailablePort(0, "127.0.0.1");
   saveConfig({

@@ -217,8 +217,9 @@ GUI, session bootstrap/exchange, and `/api/*`.
 
 ### Claude intercept pair
 
-After the startup transaction, `startServer` also starts the optional Claude intercept pair from
-`src/claude/intercept/runtime.ts`: a loopback HTTP CONNECT proxy (`src/claude/intercept/connect-proxy.ts`)
+At the end of the startup transaction, `startServer` also starts the optional Claude intercept pair
+through `src/server/index/claude-intercept-lifecycle.ts` (fire-and-forget start, `ownsListener` for
+the ingress decision, `stop` joined into the listener shutdown) from `src/claude/intercept/runtime.ts`: a loopback HTTP CONNECT proxy (`src/claude/intercept/connect-proxy.ts`)
 and a loopback TLS listener (`src/claude/intercept/listener.ts`) that presents a leaf for
 `api.anthropic.com` signed by a per-install authority (`src/claude/intercept/local-ca.ts`, persisted
 under `<OPENCODEX_HOME>/claude-intercept/` with a 0600 key; never installed into an OS trust store).
@@ -231,7 +232,9 @@ origin and dispatches them to the same route table under the `claude-intercept` 
 the loopback request policy; every other path on the intercepted host is relayed verbatim to the
 configured Anthropic upstream. The pair is on by default on a hub (`claudeCode.intercept.enabled`),
 its proxy port defaults to the public port + 100 (`claudeCode.intercept.port`), and a bind failure
-degrades to a startup warning rather than a startup failure; stop joins both sockets.
+degrades to a startup warning rather than a startup failure; stop joins both sockets. A server asked
+for an ephemeral public port (`startServer(0)`, the shape every in-process test fixture uses) has no
+stable port to derive from, so the pair stays off unless `claudeCode.intercept.port` is explicit.
 
 Auxiliary listener bind failures carry the listener key and effective address through `AuxiliaryListenerBindError` in `src/server/ports.ts`. `src/cli/index.ts` reports them without retrying the public port. Startup still rolls back every earlier socket synchronously.
 

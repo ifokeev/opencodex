@@ -69,11 +69,6 @@ import { runDevinProviderMergeStartupMigration } from "../providers/devin-provid
 import { isCanonicalOpenAiForwardProvider, OPENAI_CODEX_PROVIDER_ID } from "../providers/openai-tiers";
 import { providerCodexAccountMode } from "../providers/registry";
 import type { StorageCleanupPolicy } from "../types";
-import {
-  MAX_CONFIGURABLE_INBOUND_BODY_BYTES,
-  MIN_CONFIGURABLE_INBOUND_BODY_BYTES,
-  resolveInboundBodyLimitBytes,
-} from "./request-decompress";
 import { MAIN_CODEX_ACCOUNT_ID } from "../codex/main-account";
 export {
   clearThreadAccountMap,
@@ -203,8 +198,8 @@ import {
 } from "../lib/package-tree-integrity";
 import { detectInstall } from "../update/index";
 import { createServeOptions, type ServerIngress } from "./index/serve-options";
-import { startClaudeIntercept, type ClaudeInterceptHandle } from "../claude/intercept/runtime";
-import { inspectStartupOwnership, setStartupCacheInvalidationWrite, warnAgentTaskRecoveryStartup, warnPlaintextV2AgentMessagesStartup, type StartServerDeps } from "./index/startup-warnings";
+import { createClaudeInterceptLifecycle } from "./index/claude-intercept-lifecycle";
+import { inspectStartupOwnership, resolveInboundBodyLimitWithWarning, setStartupCacheInvalidationWrite, warnAgentTaskRecoveryStartup, warnPlaintextV2AgentMessagesStartup, type StartServerDeps } from "./index/startup-warnings";
 import { acquireSpendLedgerServerLifecycle, type SpendLedgerServerLifecycle } from "./index/spend-ledger-lifecycle";
 
 export function startServer(port?: number, deps: StartServerDeps = {}): Server<WsData> {
@@ -628,29 +623,13 @@ function startServerWithSpendLedgerOwner(port: number | undefined, deps: StartSe
   let server: Server<WsData>;
   let loopbackServer: Server<WsData> | null = null;
   let managementIngressServer: Server<WsData> | null = null;
-  let claudeInterceptServer: Server<WsData> | null = null;
-  let serveOptions: ReturnType<typeof createServeOptions>;
-
-  // Resolved once, before any listener binds. The clamp is silent inside the resolver so it
-  // stays pure and per-request cheap; the operator is told here instead, once, because a
-  // config value that was quietly reduced is exactly the thing they would otherwise debug
-  // against the wrong limit.
-  const inboundBodyLimitBytes = resolveInboundBodyLimitBytes(config.maxInboundBodyBytes);
-  const requestedInboundBodyLimit = config.maxInboundBodyBytes;
-  if (requestedInboundBodyLimit !== undefined
-    && requestedInboundBodyLimit > 0
-    && requestedInboundBodyLimit !== inboundBodyLimitBytes) {
-    console.warn(
-      `[server] maxInboundBodyBytes=${requestedInboundBodyLimit} is outside the supported range `
-      + `[${MIN_CONFIGURABLE_INBOUND_BODY_BYTES}, ${MAX_CONFIGURABLE_INBOUND_BODY_BYTES}]; `
-      + `using ${inboundBodyLimitBytes} bytes.`,
-    );
-  }
+  const claudeIntercept = createClaudeInterceptLifecycle<WsData>();
+  const inboundBodyLimitBytes = resolveInboundBodyLimitWithWarning(config);
 
   function ingressForServer(requestServer: Server<WsData>): ServerIngress {
     if (requestServer === loopbackServer) return "unauthenticated-loopback";
     if (requestServer === managementIngressServer) return "hub-management";
-    if (claudeInterceptServer && requestServer === claudeInterceptServer) return "claude-intercept";
+    if (claudeIntercept.ownsListener(requestServer)) return "claude-intercept";
     return "public";
   }
   let backgroundLifecycle: ReturnType<typeof acquireServerBackgroundLifecycle> | null = null;
@@ -682,7 +661,7 @@ function startServerWithSpendLedgerOwner(port: number | undefined, deps: StartSe
     // Started inside the guarded startup transaction so the catch below can
     // release the owner-scoped lease on any listener failure.
     userCostOverlayReconciler = startUserCostOverlayReconciler({ liveConfig: config });
-    serveOptions = createServeOptions({
+    const serveOptions = createServeOptions({
       drainingResponse,
       ingressForServer,
       loopbackRouteAllowed,
@@ -752,6 +731,10 @@ function startServerWithSpendLedgerOwner(port: number | undefined, deps: StartSe
         throw new AuxiliaryListenerBindError("hub.managementIngress", managementIngressPort, "127.0.0.1", error);
       }
     }
+    claudeIntercept.start({
+      config, publicPort: server.port ?? listenPort, requestedPort: listenPort, maxRequestBodySize: inboundBodyLimitBytes,
+      dispatch: (req, requestServer) => serveOptions.fetch(req, requestServer),
+    });
   } catch (error) {
     unregisterQuotaAutoRefresh?.();
     userCostOverlayReconciler?.stop();
@@ -761,29 +744,6 @@ function startServerWithSpendLedgerOwner(port: number | undefined, deps: StartSe
   }
 
   bindNativeMainStartupLifecycle(server, nativeMainLifecycle);
-
-  const interceptDispatch = serveOptions;
-  // Claude intercept pair (CONNECT proxy + TLS listener). Optional: a bind failure degrades to
-  // a warning, never to a startup failure, because every other client keeps working without it.
-  const claudeInterceptStart: Promise<ClaudeInterceptHandle<WsData> | null> = startClaudeIntercept<WsData>({
-    config,
-    publicPort: server.port ?? listenPort,
-    maxRequestBodySize: inboundBodyLimitBytes,
-    dispatch: (req, requestServer) => {
-      claudeInterceptServer ??= requestServer;
-      return interceptDispatch.fetch(req, requestServer);
-    },
-  }).then(handle => {
-    if (handle) {
-      claudeInterceptServer = handle.listener;
-      console.log(`🔐 Claude intercept proxy active on http://127.0.0.1:${handle.proxyPort} (CONNECT api.anthropic.com → local TLS)`);
-    }
-    return handle;
-  }).catch((error: unknown) => {
-    console.warn(`⚠ Claude intercept proxy could not start: ${error instanceof Error ? error.message : String(error)}`);
-    return null;
-  });
-
   const nativeStop = server.stop.bind(server);
   const loopbackListenerRef = loopbackServer;
   const managementIngressRef = managementIngressServer;
@@ -803,7 +763,7 @@ function startServerWithSpendLedgerOwner(port: number | undefined, deps: StartSe
           ...(managementIngressRef
             ? [() => managementIngressRef.stop(closeActiveConnections)]
             : []),
-          async () => { await (await claudeInterceptStart)?.stop(); },
+          () => claudeIntercept.stop(),
           async () => { await remoteWorkspaceShutdown?.(); },
           async () => {
             try {

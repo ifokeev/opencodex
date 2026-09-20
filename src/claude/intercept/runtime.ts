@@ -46,7 +46,13 @@ export function getClaudeInterceptState(): ClaudeInterceptState | null {
 
 export interface StartClaudeInterceptOptions<T> {
   config: OcxConfig;
+  /** Bound public port; the derived proxy port is offset from it. */
   publicPort: number;
+  /**
+   * Port the operator asked for. `0` (ephemeral) gives the derived proxy port no stable value
+   * to write into `settings.json`, so intercept stays off unless `intercept.port` is explicit.
+   */
+  requestedPort?: number;
   dispatch: (req: Request, server: Server<T>) => Promise<Response>;
   maxRequestBodySize?: number;
   configDir?: string;
@@ -58,6 +64,8 @@ export interface StartClaudeInterceptOptions<T> {
  */
 export async function startClaudeIntercept<T>(options: StartClaudeInterceptOptions<T>): Promise<ClaudeInterceptHandle<T> | null> {
   if (!claudeInterceptEnabled(options.config)) return null;
+  const explicitPort = typeof options.config.claudeCode?.intercept?.port === "number";
+  if (options.requestedPort === 0 && !explicitPort) return null;
   const configDir = options.configDir ?? getConfigDir();
   const ca = ensureLocalInterceptCa(configDir);
   const leaf = issueLocalInterceptLeaf(ca, CLAUDE_INTERCEPT_HOSTS);
