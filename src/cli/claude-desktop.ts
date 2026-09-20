@@ -15,7 +15,7 @@ import {
   type DesktopFamily,
   type DesktopProfile,
 } from "../claude/desktop-profile";
-import { inspectDesktop3pConfigLibrary, writeDesktop3pConfig, type Desktop3pConfigMode, parseDesktop3pModeArgs } from "../claude/desktop-3p";
+import { inspectDesktop3pConfigLibrary, removeDesktop3pStandardPivot, writeDesktop3pConfig, type Desktop3pConfigMode, parseDesktop3pModeArgs } from "../claude/desktop-3p";
 import {
   applyDesktopFirstParty,
   removeDesktopFirstParty,
@@ -212,12 +212,17 @@ async function applyFirstPartyDesktop(
   if (connection.kind === "connected") return { ok: false, path: "", reason: "first_party_requires_local_hub" };
   if (connection.kind !== "disconnected") return { ok: false, path: "", reason: "client_connection_invalid" };
   const config = loadConfig();
-  const library = inspectDesktop3pConfigLibrary({ appliedFingerprint: config.claudeCode?.desktopProfile?.appliedFingerprint ?? null });
-  if (library.kind === "gateway_ours" || library.kind === "gateway_drifted") {
-    return { ok: false, path: library.selectedProfilePath ?? "", reason: "gateway_profile_active" };
-  }
   const desired = setIntegrationEnabled("claude-desktop", true);
   if (!desired.ok) return { ok: false, path: "", reason: desired.message };
+  // First-party replaces gateway; the two must never be active together.
+  const appliedFingerprint = config.claudeCode?.desktopProfile?.appliedFingerprint ?? null;
+  const library = inspectDesktop3pConfigLibrary({ appliedFingerprint });
+  if (library.kind === "gateway_ours" || library.kind === "gateway_drifted") {
+    const removed = removeDesktop3pStandardPivot({ appliedFingerprint, replaceWhileEnabled: true });
+    if (!removed.ok) {
+      return { ok: false, path: library.selectedProfilePath ?? "", reason: removed.kind === "cleanup_incomplete" ? "gateway_cleanup_incomplete" : `gateway_profile_active:${removed.reason ?? removed.kind}` };
+    }
+  }
   const applied = applyDesktopFirstParty(config);
   if (!applied.ok) return { ok: false, path: applied.path, reason: applied.reason };
   const saved = saveDesktopMode("first-party", deps);
@@ -343,8 +348,8 @@ export async function handleClaudeDesktopCommand(argv: string[], deps: ApplyProf
       const result = await applyDesktop(undefined, target, deps);
       if (!result.ok) {
         console.error(`설정 적용 실패: ${result.reason ?? "unknown error"}`);
-        if (result.reason === "gateway_profile_active") {
-          console.error("Claude Desktop is running the gateway profile. Turn the integration off first (dashboard toggle removes the profile), or keep it with `ocx claude desktop apply --gateway`.");
+        if (result.reason?.startsWith("gateway_")) {
+          console.error("The gateway profile could not be removed safely, so first-party mode was not applied. Turn the integration off (dashboard toggle) and retry, or keep gateway with `ocx claude desktop apply --gateway`.");
         } else if (result.reason === "foreign_env") {
           console.error(`~/.claude/settings.json already sets HTTPS_PROXY or NODE_EXTRA_CA_CERTS to a value opencodex does not own (${result.path}). Remove them or use --gateway.`);
         } else if (result.reason === "intercept_disabled") {

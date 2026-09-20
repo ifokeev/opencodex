@@ -159,10 +159,14 @@ test("POST /api/claude-desktop/apply defaults to first-party and gateway mode re
   expect(afterGateway.claudeCode?.desktopMode).toBe("gateway");
   expect(afterGateway.claudeCode?.desktopProfile?.appliedFingerprint).toBeTruthy();
 
-  // With the gateway profile installed, first-party is refused until it is removed.
-  const conflict = await dispatch("/api/claude-desktop/apply", { method: "POST", body: JSON.stringify({ mode: "first-party" }) }, afterGateway);
-  expect(conflict.status).toBe(409);
-  expect(conflict.body.reason).toBe("gateway_profile_active");
+  // Switching back replaces the gateway profile with the first-party env in one apply.
+  const back = await dispatch("/api/claude-desktop/apply", { method: "POST", body: JSON.stringify({ mode: "first-party" }) }, afterGateway);
+  expect(back.status).toBe(200);
+  expect(back.body).toMatchObject({ ok: true, mode: "first-party", applied: true, gatewayRemoved: true });
+  expect(settings().env?.HTTPS_PROXY).toBe("http://127.0.0.1:10200");
+  const afterBack = await dispatch("/api/claude-desktop/status", {}, afterGateway);
+  expect(afterBack.body).toMatchObject({ mode: "first-party", applied: true, stale: false, drift: false, desiredEnabled: true });
+  expect(["not_installed", "no_owned_state", "standard"]).toContain(afterBack.body.observedKind);
 });
 
 test("native toggle: enable applies first-party by default and disable removes the env", async () => {

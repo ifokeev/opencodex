@@ -54,9 +54,12 @@ silently, while new installs land on first-party. `resolveClaudeDesktopApplyMode
 `intercept_disabled` instead of being rewritten.
 
 Switching is ownership-aware in both directions: a gateway apply first removes the first-party env
-(only values anchored on OpenCodex's own CA path); a first-party apply refuses (`409`,
-`gateway_profile_active`) while an owned gateway profile is still selected, and refuses
-(`foreign_env`) when `settings.json` already carries a proxy/CA value OpenCodex does not own.
+(only values anchored on OpenCodex's own CA path); a first-party apply first pivots an owned
+gateway profile (`gateway_ours`/`gateway_drifted`) back to standard through
+`removeDesktop3pStandardPivot({ replaceWhileEnabled: true })` — the durable switch stays ON, so the
+OFF-flow desired-state guard is bypassed on purpose — and fails (`claude_desktop_gateway_removal_failed`)
+without writing the env if that pivot cannot complete. It refuses (`foreign_env`) when
+`settings.json` already carries a proxy/CA value OpenCodex does not own.
 Disabling the integration (native toggle, `ocx ensure` with the durable switch OFF) removes both the
 gateway profile and the first-party env. With the switch ON in first-party mode, `ocx ensure`
 re-applies a stale env (the proxy port follows the public port).
