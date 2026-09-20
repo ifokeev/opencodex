@@ -1570,7 +1570,9 @@
     "codex-shim-destroyed-probe.test.ts": "codex-integration",
     "client-runtime.test.ts": "clients",
     "usage-timeline.test.ts": "usage",
-    "companion-settings.test.ts": "server"
+    "companion-settings.test.ts": "server",
+    "devin-output-budget.test.ts": "providers",
+    "api-key-model-scope.test.ts": "server"
   },
   "migrated": [
     "adapters",
