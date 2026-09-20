@@ -261,7 +261,10 @@ export const configSchema = z.object({
   if (claudeCode !== undefined && (!claudeCode || typeof claudeCode !== "object" || Array.isArray(claudeCode))) {
     ctx.addIssue({ code: "custom", path: ["claudeCode"], message: "claudeCode must be an object" });
   } else if (claudeCode) {
-    const claude = claudeCode as { desktopProfile?: unknown; intercept?: unknown };
+    const claude = claudeCode as { desktopProfile?: unknown; desktopMode?: unknown; intercept?: unknown };
+    if (claude.desktopMode !== undefined && claude.desktopMode !== "first-party" && claude.desktopMode !== "gateway") {
+      ctx.addIssue({ code: "custom", path: ["claudeCode", "desktopMode"], message: "desktopMode must be \"first-party\" or \"gateway\"" });
+    }
     if (claude.intercept !== undefined) {
       const intercept = claude.intercept;
       if (!intercept || typeof intercept !== "object" || Array.isArray(intercept)) {
