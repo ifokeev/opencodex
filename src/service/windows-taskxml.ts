@@ -80,6 +80,7 @@ export function buildWindowsServiceScript(
     windowsBatchSet("OCX_SERVICE_LOG", serviceLogPath(), "path"),
     windowsBatchSet("OCX_BUN", bun, "path"),
     windowsBatchSet("OCX_CLI", cli ?? undefined, "path"),
+    // Standalone executables have no npm package tree; recovery is "replace the executable", so no OCX_PKG_DIR/restore_backup wiring.
     // Package root for the transactional-update restore path (#1942): cli is
     // <pkg>\src\cli\index.ts, so the package dir is three levels up.
     cli ? 'for %%I in ("%OCX_CLI%\\..\\..\\..") do set "OCX_PKG_DIR=%%~fI"' : null,
