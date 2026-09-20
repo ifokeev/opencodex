@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createResponsesPassthroughAdapter as createResponsesPassthroughAdapterProduction } from "../../src/adapters/openai-responses";
+import { stripMuseSparkUnsupportedWebSearchFields } from "../../src/adapters/openai-responses/web-search";
 import { getProviderRegistryEntry } from "../../src/providers/registry";
 import type { OcxProviderConfig } from "../../src/types";
 import { withTestTranslatorBudget } from "../helpers/translator-budget";
@@ -284,6 +285,16 @@ describe("#2617/#3378 Muse Spark web_search compatibility", () => {
       expect(Object.hasOwn(plain!, "indexed_web_access")).toBe(false);
       // The destination is the predicate here, not the id: it must not swallow the preview shape.
       expect(preview!.search_content_types).toEqual(["text", "image"]);
+      expect(preview!.indexed_web_access).toBe(true);
     }
+  });
+
+  test("direct Meta remains destination-scoped when the model id is unavailable", () => {
+    const body = { tools: [webSearchTool()] };
+    const rewritten = stripMuseSparkUnsupportedWebSearchFields(body, undefined, "https://api.meta.ai/v1/responses") as {
+      tools: Array<Record<string, unknown>>;
+    };
+    expect(Object.hasOwn(rewritten.tools[0]!, "search_content_types")).toBe(false);
+    expect(Object.hasOwn(rewritten.tools[0]!, "indexed_web_access")).toBe(false);
   });
 });

@@ -118,7 +118,6 @@ export function stripMuseSparkUnsupportedWebSearchFields(
   responseUrl: string,
 ): unknown {
   if (!isPlainObject(body)) return body;
-  if (typeof modelId !== "string") return body;
   let destination: string;
   try {
     const url = new URL(responseUrl);
@@ -130,7 +129,7 @@ export function stripMuseSparkUnsupportedWebSearchFields(
   if (!MUSE_SPARK_WEB_SEARCH_STRICT_RESPONSE_URLS.has(destination)) return body;
   if (
     destination !== MUSE_SPARK_STRICT_ANY_MODEL_DESTINATION
-    && !MUSE_SPARK_WEB_SEARCH_STRICT_MODELS.has(modelId.trim().toLowerCase())
+    && (typeof modelId !== "string" || !MUSE_SPARK_WEB_SEARCH_STRICT_MODELS.has(modelId.trim().toLowerCase()))
   ) return body;
 
   const rewriteTools = (tools: unknown[]): { tools: unknown[]; changed: boolean } => {
