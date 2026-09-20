@@ -32,6 +32,8 @@ The release workflow packages the desktop shell as `OpenCodex-<version>-macos.dm
 signed updater artifacts also carry `.sig` files. A release attachment job combines the
 standalone and desktop assets, verifies checksums, and writes `latest.json` with only
 platforms that have updater signatures.
+On macOS, in-app updates download `OpenCodex-<version>-macos.app.tar.gz`; the DMG is for
+the first installation.
 
 The Tauri updater public key and endpoint are checked in to
 `desktop/src-tauri/tauri.conf.json`. Private updater and Apple signing credentials are

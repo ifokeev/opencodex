@@ -27,8 +27,8 @@ export interface UpdaterManifest {
 }
 
 const platformFiles: Record<string, string> = {
-  "darwin-aarch64": "macos.dmg",
-  "darwin-x86_64": "macos.dmg",
+  "darwin-aarch64": "macos.app.tar.gz",
+  "darwin-x86_64": "macos.app.tar.gz",
   "windows-x86_64": "windows-x64.msi",
   "linux-x86_64": "linux-x86_64.AppImage",
 };

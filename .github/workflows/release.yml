@@ -181,7 +181,7 @@ jobs:
             target: universal-apple-darwin
             bundles: app,dmg
             sidecar-targets: macos
-            artifact-suffixes: macos.dmg
+            artifact-suffixes: macos.dmg,macos.app.tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             bundles: msi

@@ -9,16 +9,31 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 
-type BundleKind = "dmg" | "msi" | "appimage" | "deb";
+type BundleKind = "dmg" | "app.tar.gz" | "msi" | "appimage" | "deb";
 
-const bundlesByTarget: Record<string, Array<{ kind: BundleKind; name: string }>> = {
-  "universal-apple-darwin": [{ kind: "dmg", name: "macos.dmg" }],
-  "aarch64-apple-darwin": [{ kind: "dmg", name: "macos.dmg" }],
-  "x86_64-apple-darwin": [{ kind: "dmg", name: "macos.dmg" }],
-  "x86_64-pc-windows-msvc": [{ kind: "msi", name: "windows-x64.msi" }],
+interface BundleSpec {
+  kind: BundleKind;
+  dir: string;
+  name: string;
+}
+
+const bundlesByTarget: Record<string, BundleSpec[]> = {
+  "universal-apple-darwin": [
+    { kind: "dmg", dir: "dmg", name: "macos.dmg" },
+    { kind: "app.tar.gz", dir: "macos", name: "macos.app.tar.gz" },
+  ],
+  "aarch64-apple-darwin": [
+    { kind: "dmg", dir: "dmg", name: "macos.dmg" },
+    { kind: "app.tar.gz", dir: "macos", name: "macos.app.tar.gz" },
+  ],
+  "x86_64-apple-darwin": [
+    { kind: "dmg", dir: "dmg", name: "macos.dmg" },
+    { kind: "app.tar.gz", dir: "macos", name: "macos.app.tar.gz" },
+  ],
+  "x86_64-pc-windows-msvc": [{ kind: "msi", dir: "msi", name: "windows-x64.msi" }],
   "x86_64-unknown-linux-gnu": [
-    { kind: "appimage", name: "linux-x86_64.AppImage" },
-    { kind: "deb", name: "linux-amd64.deb" },
+    { kind: "appimage", dir: "appimage", name: "linux-x86_64.AppImage" },
+    { kind: "deb", dir: "deb", name: "linux-amd64.deb" },
   ],
 };
 
@@ -34,7 +49,7 @@ function findBundle(directory: string, kind: BundleKind): string {
     throw new Error(`Missing ${kind} bundle directory: ${directory}`);
   }
   const artifact = readdirSync(directory)
-    .filter(name => name.toLowerCase().endsWith(`.${kind}`))
+    .filter(name => name.toLowerCase().endsWith(`.${kind.toLowerCase()}`))
     .sort()[0];
   if (!artifact) throw new Error(`No ${kind} bundle found in ${directory}`);
   return join(directory, artifact);
@@ -50,7 +65,7 @@ export function collectReleaseAssets(options: CollectReleaseAssetsOptions): stri
   const written: string[] = [];
   for (const bundle of bundles) {
     const source = findBundle(
-      join(repoRoot, "desktop", "src-tauri", "target", options.target, "release", "bundle", bundle.kind),
+      join(repoRoot, "desktop", "src-tauri", "target", options.target, "release", "bundle", bundle.dir),
       bundle.kind,
     );
     const destinationName = `OpenCodex-${options.version}-${bundle.name}`;

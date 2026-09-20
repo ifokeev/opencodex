@@ -61,7 +61,8 @@ embedded dashboard and your normal browser. The tray also provides update checks
 
 Choose **Check for Updates…** in the tray menu to check immediately. Release builds also
 check automatically after startup and every six hours. Updates are verified with the
-project's signed updater public key before installation.
+project's signed updater public key before installation. On macOS, in-app updates download
+`OpenCodex-<version>-macos.app.tar.gz`; the DMG is for the first installation.
 
 ## Widget
 
