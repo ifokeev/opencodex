@@ -94,6 +94,9 @@ choisissez les modèles, gérez les comptes. `ocx gui`
 rouvre le tableau de bord à tout moment.
 ### Application macOS dans la barre des menus
 
+Téléchargez l’application de bureau pour macOS, Windows ou Linux depuis la
+[page des releases](https://github.com/lidge-jun/opencodex/releases).
+
 Un compagnon natif pour l’état du proxy, l’utilisation et les quotas des fournisseurs sans ouvrir
 le tableau de bord. Le code source se trouve dans [`app/`](../app) (Swift + AppKit, sans dépendance
 tierce). Téléchargez-le depuis la

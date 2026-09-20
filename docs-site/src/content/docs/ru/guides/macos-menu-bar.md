@@ -17,15 +17,19 @@ description: Нативное приложение, показывающее с�
 
 ## Установка
 
-Скачайте `OpenCodex-<версия>-macos-universal.zip` со
-[страницы релизов](https://github.com/lidge-jun/opencodex/releases), распакуйте и
-переместите `OpenCodex.app` в папку «Программы».
-
-Если хотите проверить загрузку, к каждому релизу прилагается контрольная сумма:
+Основной способ установки — настольное приложение OpenCodex. На
+[странице релизов](https://github.com/lidge-jun/opencodex/releases) скачайте для macOS
+`OpenCodex-<версия>-macos.dmg`, откройте DMG и перетащите `OpenCodex.app` в «Программы».
+В Windows запустите `OpenCodex-<версия>-windows-x64.msi`, а в Linux используйте AppImage
+или `OpenCodex-<версия>-linux-amd64.deb`.
 
 ```bash
-shasum -a 256 -c OpenCodex-<версия>-macos-universal.zip.sha256
+chmod +x OpenCodex-<версия>-linux-x86_64.AppImage
+sudo apt install ./OpenCodex-<версия>-linux-amd64.deb
 ```
+
+Windows SmartScreen и macOS Gatekeeper могут показать предупреждение. Приложение подключается
+к существующему `ocx`, а если его нет — запускает встроенный sidecar.
 
 ## Первый запуск: Gatekeeper
 

@@ -17,15 +17,18 @@ API에 붙는 클라이언트입니다.
 
 ## 설치
 
-[릴리스 페이지](https://github.com/lidge-jun/opencodex/releases)에서
-`OpenCodex-<버전>-macos-universal.zip`을 받아 압축을 풀고 `OpenCodex.app`을 응용
-프로그램 폴더로 옮기세요.
-
-받은 파일을 검증하고 싶다면 릴리스마다 체크섬이 함께 올라갑니다.
+기본 설치 경로는 OpenCodex 데스크톱 앱입니다. [릴리스 페이지](https://github.com/lidge-jun/opencodex/releases)에서 macOS용
+`OpenCodex-<버전>-macos.dmg`를 내려받아 DMG를 열고 `OpenCodex.app`을 응용 프로그램
+폴더로 드래그하세요. Windows에서는 `OpenCodex-<버전>-windows-x64.msi`를 실행하고,
+Linux에서는 AppImage 또는 `OpenCodex-<버전>-linux-amd64.deb`를 사용하세요.
 
 ```bash
-shasum -a 256 -c OpenCodex-<버전>-macos-universal.zip.sha256
+chmod +x OpenCodex-<버전>-linux-x86_64.AppImage
+sudo apt install ./OpenCodex-<버전>-linux-amd64.deb
 ```
+
+Windows SmartScreen 또는 macOS Gatekeeper 경고가 표시될 수 있습니다. 앱은 기존 `ocx`
+프록시에 연결하고, 찾지 못하면 포함된 사이드카를 시작합니다.
 
 ## 첫 실행: Gatekeeper 차단
 

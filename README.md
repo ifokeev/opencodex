@@ -93,6 +93,9 @@ re-opens the dashboard at any time.
 
 ### macOS desktop app and widget
 
+Download the desktop app for macOS, Windows, or Linux from the
+[latest releases](https://github.com/lidge-jun/opencodex/releases).
+
 A native desktop app and WidgetKit extension for proxy status, usage, and provider
 quotas without opening the dashboard. The snapshot model lives in [`app/`](./app)
 (`MenuBarCore`). Download it from the

@@ -97,6 +97,8 @@ ocx start                         # 代理 + 儀表板位於 localhost:10100
 
 ### macOS 選單列應用程式
 
+請從[發行頁面](https://github.com/lidge-jun/opencodex/releases)下載 macOS、Windows 或 Linux 桌面應用程式。
+
 無需開啟儀表板即可查看代理狀態、用量與供應商配額的原生伴侶應用程式。原始碼位於
 [`app/`](../app)（Swift + AppKit，沒有第三方相依套件）。請從[發行頁面](https://github.com/lidge-jun/opencodex/releases)
 下載，或使用 `bun run prepare-sidecar && bun run prepare-widget && bunx tauri build` 在本機建置。

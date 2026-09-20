@@ -25,3 +25,44 @@ bun run prepare-sidecar
 bun run prepare-widget
 bunx tauri build
 ```
+
+## Release packaging and updates
+
+The release workflow builds a macOS DMG, Windows MSI, Linux AppImage, and Debian package.
+It collects the platform artifacts beside checksum files and creates `latest.json` for the
+Tauri updater. The public updater key and endpoint live in `src-tauri/tauri.conf.json`;
+the private key must never be committed.
+
+To package locally:
+
+```sh
+bun run build:gui
+cd desktop
+bun install --frozen-lockfile
+bun run prepare-sidecar
+bun run prepare-widget
+bunx tauri build --ci --bundles app,dmg
+```
+
+Release signing is supplied through environment variables:
+
+```sh
+export TAURI_SIGNING_PRIVATE_KEY="..."
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="..."
+export APPLE_CERTIFICATE="..."
+export APPLE_CERTIFICATE_PASSWORD="..."
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+export APPLE_ID="..."
+export APPLE_PASSWORD="..."
+export APPLE_TEAM_ID="..."
+export MACOS_SIGN_IDENTITY="$APPLE_SIGNING_IDENTITY"
+```
+
+Generate a Tauri updater key pair with:
+
+```sh
+bunx tauri signer generate
+```
+
+Keep the private key in a local secret store. Windows SmartScreen signing is not wired
+yet; the release workflow documents that installers may show an unsigned-publisher warning.

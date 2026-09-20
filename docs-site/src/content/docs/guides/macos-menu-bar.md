@@ -18,14 +18,15 @@ current dashboard view in your normal browser.
 
 ## Install
 
-Download `OpenCodex-<version>-macos-universal.zip` from the
-[latest release](https://github.com/lidge-jun/opencodex/releases), unzip it, and move
-`OpenCodex.app` to your Applications folder.
-
-Verify the download if you like — every release ships a checksum beside it:
+Install the desktop app from the
+[latest release](https://github.com/lidge-jun/opencodex/releases). On macOS, download
+`OpenCodex-<version>-macos.dmg`, open it, and drag `OpenCodex.app` to Applications.
+Windows users can run `OpenCodex-<version>-windows-x64.msi`; Linux users can use the
+AppImage or `OpenCodex-<version>-linux-amd64.deb`.
 
 ```bash
-shasum -a 256 -c OpenCodex-<version>-macos-universal.zip.sha256
+chmod +x OpenCodex-<version>-linux-x86_64.AppImage
+sudo apt install ./OpenCodex-<version>-linux-amd64.deb
 ```
 
 ## First launch: Gatekeeper

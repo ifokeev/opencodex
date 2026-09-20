@@ -24,6 +24,20 @@ authentication remains in the shared API boundary.
 The desktop webview uses a Mozilla-compatible `OpenCodexDesktop/` user-agent
 marker, which the GUI detects to identify the shell without using IPC.
 
+## Release packaging and updater
+
+The release workflow packages the desktop shell as `OpenCodex-<version>-macos.dmg`,
+`OpenCodex-<version>-windows-x64.msi`, `OpenCodex-<version>-linux-x86_64.AppImage`, and
+`OpenCodex-<version>-linux-amd64.deb`. Each artifact is collected with a `.sha256` file;
+signed updater artifacts also carry `.sig` files. A release attachment job combines the
+standalone and desktop assets, verifies checksums, and writes `latest.json` with only
+platforms that have updater signatures.
+
+The Tauri updater public key and endpoint are checked in to
+`desktop/src-tauri/tauri.conf.json`. Private updater and Apple signing credentials are
+provided only as release secrets. Windows certificate signing is not wired yet, so MSI
+users may see a SmartScreen warning.
+
 ## Widget snapshot
 
 The macOS desktop shell writes the WidgetKit snapshot to

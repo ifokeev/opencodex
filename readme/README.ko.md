@@ -98,6 +98,8 @@ round-robin과 fill-first는 각자 정책을 따릅니다. 기존 Codex 스레�
 
 ### macOS 메뉴 막대 앱
 
+macOS, Windows, Linux용 데스크톱 앱은 [릴리스 페이지](https://github.com/lidge-jun/opencodex/releases)에서 다운로드하세요.
+
 대시보드를 열지 않고 프록시 상태, 사용량, 제공자 쿼터를 확인하는 네이티브 동반 앱입니다.
 소스는 [`app/`](../app)에 있으며 Swift + AppKit으로 작성되었고 서드파티 의존성이 없습니다.
 [릴리스 페이지](https://github.com/lidge-jun/opencodex/releases)에서 다운로드하거나

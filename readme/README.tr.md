@@ -101,6 +101,8 @@ bir hesap varsa — genellikle Codex Desktop girişiniz — hesaplara bir seçim
 
 ### macOS menü çubuğu uygulaması
 
+macOS, Windows veya Linux masaüstü uygulamasını [sürümler sayfasından](https://github.com/lidge-jun/opencodex/releases) indirin.
+
 Panoyu açmadan proxy durumunu, kullanımı ve sağlayıcı kotalarını gösteren yerel yardımcı uygulama.
 Kaynak kodu [`app/`](../app) konumundadır (Swift + AppKit, üçüncü taraf bağımlılığı yoktur).
 [Sürümler sayfasından](https://github.com/lidge-jun/opencodex/releases) indirin veya

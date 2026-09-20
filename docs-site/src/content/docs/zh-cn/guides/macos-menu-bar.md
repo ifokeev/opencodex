@@ -14,14 +14,18 @@ description: 在菜单栏中查看 OpenCodex 代理状态、用量和各提供�
 
 ## 安装
 
-从[发布页面](https://github.com/lidge-jun/opencodex/releases)下载
-`OpenCodex-<version>-macos-universal.zip`，解压后把 `OpenCodex.app` 移到「应用程序」文件夹。
-
-如果需要校验下载文件，每个版本都附带校验和：
+推荐使用 OpenCodex 桌面应用安装。从[发布页面](https://github.com/lidge-jun/opencodex/releases)下载 macOS 的
+`OpenCodex-<version>-macos.dmg`，打开 DMG 后将 `OpenCodex.app` 拖到「应用程序」文件夹。
+Windows 运行 `OpenCodex-<version>-windows-x64.msi`，Linux 使用 AppImage 或
+`OpenCodex-<version>-linux-amd64.deb`。
 
 ```bash
-shasum -a 256 -c OpenCodex-<version>-macos-universal.zip.sha256
+chmod +x OpenCodex-<version>-linux-x86_64.AppImage
+sudo apt install ./OpenCodex-<version>-linux-amd64.deb
 ```
+
+Windows SmartScreen 或 macOS Gatekeeper 可能显示警告。应用会连接现有的 `ocx` 代理；
+找不到代理时则启动内置 sidecar。
 
 ## 首次启动：Gatekeeper
 

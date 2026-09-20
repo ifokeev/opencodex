@@ -101,6 +101,8 @@ Codex 認証用の **ChatGPT アカウントプール**も管理できます。C
 
 ### macOS メニューバーアプリ
 
+macOS、Windows、Linux 向けのデスクトップアプリを[リリースページ](https://github.com/lidge-jun/opencodex/releases)からダウンロードできます。
+
 ダッシュボードを開かずにプロキシの状態、使用量、プロバイダーのクォータを確認できるネイティブ
 コンパニオンです。ソースは [`app/`](../app)（Swift + AppKit、サードパーティ依存なし）にあります。
 [リリースページ](https://github.com/lidge-jun/opencodex/releases)からダウンロードするか、

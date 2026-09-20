@@ -17,15 +17,19 @@ description: OpenCodex プロキシの状態、使用量、プロバイダーの
 
 ## インストール
 
-[リリースページ](https://github.com/lidge-jun/opencodex/releases)から
-`OpenCodex-<version>-macos-universal.zip` をダウンロードし、展開して `OpenCodex.app` を
-アプリケーションフォルダに移動します。
-
-ダウンロードを検証する場合、リリースごとにチェックサムが添付されています。
+基本のインストール方法は OpenCodex デスクトップアプリです。[リリースページ](https://github.com/lidge-jun/opencodex/releases)から、macOS では
+`OpenCodex-<version>-macos.dmg` をダウンロードし、DMG を開いて `OpenCodex.app` を
+アプリケーションフォルダへドラッグします。Windows では
+`OpenCodex-<version>-windows-x64.msi` を実行し、Linux では AppImage または
+`OpenCodex-<version>-linux-amd64.deb` を使います。
 
 ```bash
-shasum -a 256 -c OpenCodex-<version>-macos-universal.zip.sha256
+chmod +x OpenCodex-<version>-linux-x86_64.AppImage
+sudo apt install ./OpenCodex-<version>-linux-amd64.deb
 ```
+
+Windows SmartScreen や macOS Gatekeeper の警告が表示されることがあります。アプリは
+既存の `ocx` に接続し、見つからなければ同梱のサイドカーを起動します。
 
 ## 初回起動: Gatekeeper
 
