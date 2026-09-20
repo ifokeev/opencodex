@@ -1065,7 +1065,7 @@ export const vi: Record<TKey, string> = {
   "usage.companion.installLinuxStep3": "Ứng dụng kết nối proxy này hoặc khởi chạy proxy đi kèm.",
   "usage.companion.notConnected": "Chưa có ứng dụng trên thanh menu nào kết nối với proxy này.",
   "usage.companion.lastSeen": "Lần kết nối gần nhất {age}",
-  "usage.companion.installAnother": "Cài đặt trên máy Mac khác",
+  "usage.companion.installAnother": "Cài đặt trên thiết bị khác",
   "usage.companion.modelsCount": "{selected}/{total} trên biểu đồ",
   "usage.companion.modelsShowAll": "Hiện tất cả",
   "usage.companion.hideProviders": "Ẩn nhà cung cấp",

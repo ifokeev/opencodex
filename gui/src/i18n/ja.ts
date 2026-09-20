@@ -1007,7 +1007,7 @@ export const ja: Record<TKey, string> = {
   "usage.companion.installLinuxStep3": "アプリはこのプロキシに接続するか、同梱のプロキシを起動します。",
   "usage.companion.notConnected": "このプロキシに接続したメニューバーアプリはまだありません。",
   "usage.companion.lastSeen": "最終接続 {age}",
-  "usage.companion.installAnother": "別の Mac にインストール",
+  "usage.companion.installAnother": "別のデバイスにインストール",
   "usage.companion.modelsCount": "{selected} / {total} がグラフに表示中",
   "usage.companion.modelsShowAll": "すべて表示",
   "usage.companion.hideProviders": "プロバイダーを非表示",

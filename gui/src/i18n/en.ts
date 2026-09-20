@@ -1055,7 +1055,7 @@ export const en = {
   "usage.companion.installLinuxStep3": "The app attaches to this proxy, or starts its bundled one.",
   "usage.companion.notConnected": "No menu bar app has connected to this proxy yet.",
   "usage.companion.lastSeen": "Last seen {age}",
-  "usage.companion.installAnother": "Install on another Mac",
+  "usage.companion.installAnother": "Install on another device",
   "usage.companion.saved": "Saved · {time}",
   "usage.companion.saveFailed": "Couldn’t save: {error}",
   "usage.companion.reset": "Reset to defaults",

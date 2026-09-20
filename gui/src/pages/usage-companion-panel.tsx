@@ -405,23 +405,27 @@ export default function UsageCompanionPanel({
           : installOs === "linux"
             ? <code className="usage-companion-install-command">chmod +x OpenCodex-*.AppImage</code>
             : null;
+        const installGuidance = (
+          <details>
+            <summary>{t("usage.companion.installAnother")}</summary>
+            <OsSelector value={installOs} onChange={setInstallOs} t={t} />
+            {steps}
+            {installCommand}
+          </details>
+        );
         if (shell) {
           return (
             <div className="usage-companion-install usage-companion-install--shell">
               <p>{t("usage.companion.runningInDesktop", { version: shellVersion })}</p>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => void openInBrowser()}>{t("usage.companion.openInBrowser")}</button>
+              {installGuidance}
             </div>
           );
         }
         return connected ? (
           <div className="usage-companion-install usage-companion-install--connected">
             <div className="usage-companion-install-status"><span className="usage-companion-install-dot" aria-hidden="true" />{t(response?.companion?.kind === "desktop" ? "usage.companion.connectedDesktop" : "usage.companion.connected", { age })}</div>
-            <details>
-              <summary>{t("usage.companion.installAnother")}</summary>
-              <OsSelector value={installOs} onChange={setInstallOs} t={t} />
-              {steps}
-              {installCommand}
-            </details>
+            {installGuidance}
           </div>
         ) : (
           <details className="usage-companion-install" open>

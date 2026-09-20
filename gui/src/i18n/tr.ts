@@ -1082,7 +1082,7 @@ export const tr: Record<TKey, string> = {
   "usage.companion.installLinuxStep3": "Uygulama bu proxy’ye bağlanır veya paketlenmiş olanı başlatır.",
   "usage.companion.notConnected": "Bu proxy'ye henüz hiçbir menü çubuğu uygulaması bağlanmadı.",
   "usage.companion.lastSeen": "Son görülme {age}",
-  "usage.companion.installAnother": "Başka bir Mac'e yükle",
+  "usage.companion.installAnother": "Başka bir cihaza yükle",
   "usage.companion.modelsCount": "Grafikte {selected}/{total}",
   "usage.companion.modelsShowAll": "Tümünü göster",
   "usage.companion.hideProviders": "Sağlayıcıları gizle",

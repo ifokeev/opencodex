@@ -1076,7 +1076,7 @@ export const ko: Record<TKey, string> = {
   "usage.companion.installLinuxStep3": "앱이 이 프록시에 연결하거나 번들 프록시를 시작합니다.",
   "usage.companion.notConnected": "아직 이 프록시에 연결한 메뉴 막대 앱이 없습니다.",
   "usage.companion.lastSeen": "마지막 연결 {age}",
-  "usage.companion.installAnother": "다른 Mac에 설치",
+  "usage.companion.installAnother": "다른 기기에 설치",
   "usage.companion.modelsCount": "{selected} / {total}개가 차트에 표시됨",
   "usage.companion.modelsShowAll": "모두 표시",
   "usage.companion.hideProviders": "공급자 숨기기",

@@ -1002,7 +1002,7 @@ export const de: Record<TKey, string> = {
   "usage.companion.installLinuxStep3": "Die App verbindet sich mit diesem Proxy oder startet den gebündelten Proxy.",
   "usage.companion.notConnected": "Noch keine Menüleisten-App hat sich mit diesem Proxy verbunden.",
   "usage.companion.lastSeen": "Zuletzt gesehen {age}",
-  "usage.companion.installAnother": "Auf einem anderen Mac installieren",
+  "usage.companion.installAnother": "Auf einem anderen Gerät installieren",
   "usage.companion.saved": "Gespeichert · {time}",
   "usage.companion.saveFailed": "Speichern fehlgeschlagen: {error}",
   "usage.companion.reset": "Auf Standardwerte zurücksetzen",

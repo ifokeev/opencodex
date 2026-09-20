@@ -1072,7 +1072,7 @@ export const fr: Record<TKey, string> = {
   "usage.companion.installLinuxStep3": "L’application se connecte à ce proxy ou démarre celui fourni.",
   "usage.companion.notConnected": "Aucune app de barre des menus ne s’est encore connectée à ce proxy.",
   "usage.companion.lastSeen": "Dernière connexion {age}",
-  "usage.companion.installAnother": "Installer sur un autre Mac",
+  "usage.companion.installAnother": "Installer sur un autre appareil",
   "usage.companion.modelsCount": "{selected} sur {total} dans le graphique",
   "usage.companion.modelsShowAll": "Tout afficher",
   "usage.companion.hideProviders": "Masquer les fournisseurs",

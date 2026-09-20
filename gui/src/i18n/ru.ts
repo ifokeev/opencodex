@@ -1063,7 +1063,7 @@ export const ru: Record<TKey, string> = {
   "usage.companion.installLinuxStep3": "Приложение подключится к этому прокси или запустит встроенный.",
   "usage.companion.notConnected": "К этому прокси ещё не подключалось приложение из строки меню.",
   "usage.companion.lastSeen": "Последнее подключение: {age}",
-  "usage.companion.installAnother": "Установить на другом Mac",
+  "usage.companion.installAnother": "Установить на другом устройстве",
   "usage.companion.modelsCount": "{selected} из {total} на графике",
   "usage.companion.modelsShowAll": "Показать все",
   "usage.companion.hideProviders": "Скрыть провайдеров",

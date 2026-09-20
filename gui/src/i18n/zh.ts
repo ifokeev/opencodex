@@ -1057,7 +1057,7 @@ export const zh: Record<TKey, string> = {
   "usage.companion.installLinuxStep3": "应用会连接此代理，或启动内置代理。",
   "usage.companion.notConnected": "尚未有菜单栏应用连接到此代理。",
   "usage.companion.lastSeen": "上次连接 {age}",
-  "usage.companion.installAnother": "在另一台 Mac 上安装",
+  "usage.companion.installAnother": "在另一台设备上安装",
   "usage.companion.modelsCount": "图表显示 {selected}/{total}",
   "usage.companion.modelsShowAll": "显示全部",
   "usage.companion.hideProviders": "隐藏提供商",

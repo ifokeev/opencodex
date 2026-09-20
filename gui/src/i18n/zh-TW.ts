@@ -884,7 +884,7 @@ export const zhTW: Record<TKey, string> = {
   "usage.companion.installLinuxStep3": "App 會連線此 Proxy，或啟動內建 Proxy。",
   "usage.companion.notConnected": "尚未有選單列 App 連線到此 Proxy。",
   "usage.companion.lastSeen": "上次連線 {age}",
-  "usage.companion.installAnother": "在另一台 Mac 上安裝",
+  "usage.companion.installAnother": "在另一台裝置上安裝",
   "usage.companion.modelsCount": "圖表顯示 {selected}/{total}",
   "usage.companion.modelsShowAll": "顯示全部",
   "usage.companion.hideProviders": "隱藏提供者",
