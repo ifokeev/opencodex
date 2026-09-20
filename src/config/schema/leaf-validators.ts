@@ -234,12 +234,12 @@ const modelCapabilitiesSchema = z.unknown().superRefine((value, ctx) => {
 const providerProxySchema = z.unknown().superRefine((value, ctx) => {
   const error = providerEgressConfigError({ proxy: value as string | null | undefined });
   if (error) ctx.addIssue({ code: "custom", message: error });
-});
+}).transform(value => value as string | null | undefined);
 
 const providerNoProxySchema = z.unknown().superRefine((value, ctx) => {
   const error = providerEgressConfigError({ noProxy: value as string | string[] | undefined });
   if (error) ctx.addIssue({ code: "custom", message: error });
-});
+}).transform(value => value as string | string[] | undefined);
 
 /**
  * Zod schema for one provider entry: known fields are validated strictly while unknown
