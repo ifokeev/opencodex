@@ -267,6 +267,28 @@ to choose direct egress explicitly.
 evaluated for each request. A matching destination goes direct whether the provider would otherwise
 use its own `proxy` or inherit a global proxy.
 
+#### What the route covers
+
+The route is applied to routed inference, provider discovery and connection tests, and API-key
+quota probes. Some transports cannot carry it, and OpenCodex says so rather than pretending
+otherwise:
+
+- **OAuth token exchange and refresh** keep using the process-wide proxy. These reach fixed vendor
+  endpoints from code that holds no provider configuration, so a provider pinned to its own proxy
+  or to `"direct"` still refreshes its credentials by the global route. OAuth-backed quota probes
+  and API-key validation probes behave the same way.
+- **The Responses WebSocket fast lane** selects its proxy when it dials and cannot carry a
+  per-provider route, so a provider that declares one serves those turns over HTTP/SSE instead and
+  logs a one-time notice.
+- **Cursor's default HTTP/2 transport**, the **CodeBuddy and Qoder subprocess providers** (their
+  child environment omits proxy variables), and the **Compatibility Lab** pinned sender do not
+  apply it.
+- Endpoints that do not route a model — image generation and edits, audio transcription, live and
+  realtime calls, and unqualified `/v1/alpha/search` — have no provider route to apply.
+
+A provider configured with a custom `fetch` executor is refused rather than silently sent by the
+executor's own route.
+
 This example keeps a global proxy for ordinary traffic, sends one provider through a regional HTTP
 proxy, and pins another provider to a direct connection:
 

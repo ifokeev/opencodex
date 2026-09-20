@@ -266,10 +266,14 @@ export function providerEgressSendInit(
   if (url === null) return {};
   const egress = resolveProviderEgress({ providerName: binding.providerName, provider: binding.provider, url });
   if (providerEgressIsExplicit(egress) && !isEgressTransparentExecutor(physicalFetch)) {
+    // Name the field that actually made the route explicit. A bypass-list match with no
+    // `proxy` field at all would otherwise tell the operator to remove an override they
+    // never wrote.
+    const field = egress.kind === "direct" && egress.reason === "noProxy" ? "noProxy" : "proxy";
     throw new InvalidProviderEgressError(
-      "proxy",
+      field,
       "the selected transport owns its own routing, so this route cannot be applied",
-      `providers.${binding.providerName}.proxy cannot be applied to the selected provider transport; `
+      `providers.${binding.providerName}.${field} cannot be applied to the selected provider transport; `
       + "remove the provider egress override or the custom executor",
     );
   }

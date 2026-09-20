@@ -27,6 +27,13 @@ export { withUpstreamHttpVersion };
 const egressWebsocketDowngradeWarned = new Set<string>();
 /** A provider name is configuration-controlled, so the notice set is bounded like any cache. */
 const EGRESS_DOWNGRADE_NOTICE_LIMIT = 64;
+/**
+ * Marks an init whose provider egress route an outer physical-send boundary already decided.
+ *
+ * Own symbol keys survive object spread, so the mark travels through the rebuild a
+ * `dispatchOverride` performs, and an unknown symbol on a `RequestInit` is inert at the wire.
+ */
+const EGRESS_DECIDED = Symbol.for("opencodex.provider-egress.decided");
 
 /**
  * Announce once, per provider, that an explicit egress route moved this provider off the
@@ -149,13 +156,20 @@ export function sendWithConnectionPolicy(
   // executor was just selected. A `dispatchOverride` that rebuilds a queued request can change
   // both the upstream host and the provider transport after the wrapper was constructed, so a
   // route resolved at construction could be applied to a different host than it was decided for.
-  const egressInit = egress ? providerEgressSendInit(egress, physicalFetch, input) : {};
+  // These calls nest: an override decides with its own binding and then hands the send to the
+  // executor `providerFetch` supplied, which is another one of these. The outermost caller holds
+  // the reselected provider and the rebuilt destination, so it decides and marks the init; the
+  // inner pass honours that mark rather than recomputing from a stale closure.
+  const alreadyDecided = (init as Record<symbol, unknown> | undefined)?.[EGRESS_DECIDED] === true;
+  const decide = egress !== undefined && !alreadyDecided;
+  const egressInit = decide ? providerEgressSendInit(egress, physicalFetch, input) : {};
   return physicalFetch(input, {
     ...init,
     headers,
     redirect: "manual",
     ...(fresh ? { keepalive: false } : {}),
     ...egressInit,
+    ...(decide ? { [EGRESS_DECIDED]: true } : {}),
   });
 }
 
@@ -203,19 +217,31 @@ export function providerFetch(
   };
   // Rebuilt dispatches must use the same physical-send boundary as ordinary HTTP sends.
   // Return the original 3xx so the response owner retains its retry/health/relay contract.
-  const dispatch = Object.assign(
+  //
+  // Marked transparent because it forwards its init to a transport that honours the proxy
+  // option. Leaving it unmarked would make an ordinary configured provider refuse its own route
+  // on every overridden path, after the attempt had already been recorded — an override selects
+  // `provider.fetch ?? execute`, and `execute` is this wrapper. It still carries the binding, so
+  // an override that simply calls it gets the route decided rather than dropped; an override
+  // that decided for itself has already marked the init and this pass defers to that decision.
+  const dispatch = markEgressTransparentExecutor(Object.assign(
     (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) =>
       sendWithConnectionPolicy(base, input, init, egressBinding),
     { preconnect },
-  ) as typeof globalThis.fetch;
+  ) as typeof globalThis.fetch);
   const httpFetch = Object.assign(
     async (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => {
-      // Refuse an inapplicable route before any dispatch side effect. `beforeDispatch` commits
-      // attempt accounting and consumes admission state, so a refusal that fired after it would
-      // charge an attempt for a send that never happens -- and a throwing hook would mask the
-      // egress error with an unrelated one. The authoritative decision is still made at the
-      // physical send, against the destination that send actually uses; this is the fast fail.
-      providerEgressSendInit(egressBinding, base, input);
+      // Refuse before any dispatch side effect where that is sound. `beforeDispatch` commits
+      // attempt accounting and consumes admission state, so a refusal firing after it would
+      // charge an attempt for a send that never happens, and a throwing hook would mask the
+      // egress error with an unrelated one.
+      //
+      // With no override, this input and `base` ARE the final destination and executor, so the
+      // full decision can be made now. With an override, only the configured value is checked:
+      // the override may rebuild against a different host and select a different transport, and
+      // refusing on this destination would reject a request whose real route is fine.
+      if (options.dispatchOverride) egressFor(input);
+      else providerEgressSendInit(egressBinding, base, input);
       // The hook inspects the outgoing headers and refuses the send by throwing; it is not a
       // mutator, and the copy it receives is deliberately not threaded onward. `Connection`
       // is decided inside `dispatch`, which runs after this, so the fresh-connection policy

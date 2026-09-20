@@ -3,7 +3,11 @@ import { CODEX_RESPONSES_HTTP_URL } from "../../src/server/responses/codex-ws-re
 import { MIN_BOUNDED_CODEX_WS_BUN_VERSION } from "../../src/server/responses/ws-upstream";
 import { InvalidProviderEgressError, PROVIDER_EGRESS_DIRECT } from "../../src/lib/provider-egress";
 import { markEgressTransparentExecutor } from "../../src/lib/provider-egress";
-import { __resetEgressWebsocketDowngradeNotices, providerFetch } from "../../src/server/responses/fetch-helpers";
+import {
+  __resetEgressWebsocketDowngradeNotices,
+  providerFetch,
+  sendWithConnectionPolicy,
+} from "../../src/server/responses/fetch-helpers";
 import { PROXY_ENV_KEYS } from "../../src/lib/proxy-env";
 import type { OcxProviderConfig } from "../../src/types";
 
@@ -210,5 +214,48 @@ describe("per-provider egress on the inference dispatch", () => {
     configured.fetch = wrapper;
     await providerFetch(configured, undefined, { providerName: "vendor" })(TARGET, { method: "POST", body: "{}" });
     expect(seen).toEqual([`${PROVIDER_PROXY}/`]);
+  });
+
+  test("an override that drives the physical boundary itself keeps an ordinary provider routable", async () => {
+    // The production shape: `dispatchOverride` calls the connection policy with
+    // `provider.fetch ?? execute` and its own binding, so `execute` -- the executor this module
+    // supplies -- becomes the selected transport. Treating that wrapper as caller-owned would
+    // refuse every configured provider on this path, and only after the attempt was recorded,
+    // which is precisely the failure an assertion on the returned status cannot see.
+    for (const key of proxyKeys) delete process.env[key];
+    const captured = captureDispatch();
+    const configured = provider({ proxy: PROVIDER_PROXY });
+    try {
+      const response = await providerFetch(configured, undefined, {
+        providerName: "vendor",
+        dispatchOverride: (input, init, execute) =>
+          sendWithConnectionPolicy(execute, input, init, { providerName: "vendor", provider: configured }),
+      })(TARGET, { method: "POST", body: "{}" });
+      expect(response.status).toBe(200);
+      // Decided once, by the boundary that knows the final destination.
+      expect(captured.calls).toEqual([{ url: TARGET, proxy: `${PROVIDER_PROXY}/` }]);
+    } finally {
+      captured.restore();
+    }
+  });
+
+  test("the outermost boundary owns the decision when a reselected provider differs", async () => {
+    // Reselection can replace the provider mid-dispatch, so the override's binding is fresher
+    // than the one captured when the wrapper was built. The inner pass must defer to it rather
+    // than re-deciding from the stale closure and overwriting the route.
+    for (const key of proxyKeys) delete process.env[key];
+    const captured = captureDispatch();
+    const staleProvider = provider({ proxy: PROVIDER_PROXY });
+    const reselected = provider({ proxy: PROVIDER_EGRESS_DIRECT });
+    try {
+      await providerFetch(staleProvider, undefined, {
+        providerName: "vendor",
+        dispatchOverride: (input, init, execute) =>
+          sendWithConnectionPolicy(execute, input, init, { providerName: "vendor", provider: reselected }),
+      })(TARGET, { method: "POST", body: "{}" });
+      expect(captured.calls).toEqual([{ url: TARGET, proxy: false }]);
+    } finally {
+      captured.restore();
+    }
   });
 });
