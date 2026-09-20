@@ -145,9 +145,14 @@ describe("per-provider egress on the inference dispatch", () => {
     const executor = mock(async () => new Response(null, { status: 200 }));
     const configured = provider({ proxy: PROVIDER_PROXY }) as OcxProviderConfig & { fetch?: typeof globalThis.fetch };
     configured.fetch = executor as unknown as typeof globalThis.fetch;
-    await expect(providerFetch(configured, undefined, { providerName: "vendor" })(
+    // The hook must not run either: it commits attempt accounting and consumes admission state,
+    // so charging an attempt for a send that is about to be refused would misreport the attempt
+    // and could mask the egress error behind an unrelated throw.
+    const beforeDispatch = mock(() => undefined);
+    await expect(providerFetch(configured, undefined, { providerName: "vendor", beforeDispatch })(
       TARGET, { method: "POST", body: "{}" },
     )).rejects.toThrow(InvalidProviderEgressError);
+    expect(beforeDispatch).not.toHaveBeenCalled();
     expect(executor).not.toHaveBeenCalled();
   });
 

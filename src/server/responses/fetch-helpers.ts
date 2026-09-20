@@ -210,6 +210,12 @@ export function providerFetch(
   ) as typeof globalThis.fetch;
   const httpFetch = Object.assign(
     async (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => {
+      // Refuse an inapplicable route before any dispatch side effect. `beforeDispatch` commits
+      // attempt accounting and consumes admission state, so a refusal that fired after it would
+      // charge an attempt for a send that never happens -- and a throwing hook would mask the
+      // egress error with an unrelated one. The authoritative decision is still made at the
+      // physical send, against the destination that send actually uses; this is the fast fail.
+      providerEgressSendInit(egressBinding, base, input);
       // The hook inspects the outgoing headers and refuses the send by throwing; it is not a
       // mutator, and the copy it receives is deliberately not threaded onward. `Connection`
       // is decided inside `dispatch`, which runs after this, so the fresh-connection policy
