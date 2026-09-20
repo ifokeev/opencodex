@@ -17,8 +17,9 @@ Tauri. Generated files under desktop/src-tauri/binaries/ and
 desktop/src-tauri/resources/ remain ignored.
 
 The management API companion presence check in
-`src/server/management/companion-routes.ts` recognizes the
-`OpenCodexDesktop/` user agent. This is presence telemetry only; management
+`src/server/management/companion-routes.ts` accepts both
+`OpenCodexMenuBar/` (legacy Swift companion) and `OpenCodexDesktop/` user agents.
+This is presence telemetry only; management
 authentication remains in the shared API boundary.
 The desktop webview uses a Mozilla-compatible `OpenCodexDesktop/` user-agent
 marker, which the GUI detects to identify the shell without using IPC.

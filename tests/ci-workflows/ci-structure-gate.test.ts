@@ -77,6 +77,7 @@ test("the aggregate gate expects the job instead of ignoring it", () => {
 
 test("app changes select the macOS widget job", () => {
   expect(filters.ci).toContain("app/**");
+  expect(filters.ci).toContain("desktop/**");
   const widget = workflow.jobs?.widget;
   expect(widget?.if).toContain("needs.changes.outputs.ci == 'true'");
   expect(Array.isArray(widget?.needs) ? widget?.needs : []).toContain("changes");
