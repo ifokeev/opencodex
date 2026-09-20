@@ -114,7 +114,7 @@ final class MetricsView: NSView {
     private let columnsRow: NSStackView
 
     init() {
-        let captions = ["REQUESTS", "TOKENS", "COST"]
+        let captions = ["TOKENS", "REQUESTS", "COST"]
         columns = captions.map { caption in
             (makeLabel(caption, font: Theme.micro, color: Theme.faint),
              makeLabel(Format.unknown, font: Theme.numeric, color: Theme.text))
@@ -167,8 +167,8 @@ final class MetricsView: NSView {
             emptyLabel.isHidden = true
             let summary = usage?.summary
             let requests = Format.count(summary?.requests)
-            columns[0].value.stringValue = (summary?.hasEstimates ?? false) ? requests + "~" : requests
-            columns[1].value.stringValue = Format.tokens(summary?.totalTokens)
+            columns[0].value.stringValue = Format.tokens(summary?.totalTokens)
+            columns[1].value.stringValue = (summary?.hasEstimates ?? false) ? requests + "~" : requests
             columns[2].value.stringValue = Format.cost(summary?.estimatedCostUsd)
             columns[0].value.setAccessibilityLabel(
                 (summary?.hasEstimates ?? false)

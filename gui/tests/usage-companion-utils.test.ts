@@ -59,6 +59,16 @@ describe("usage companion utilities", () => {
     ]);
   });
 
+  test("keeps known totals for models absent from the current timeline", () => {
+    expect(groupCompanionModels(
+      ["openai/gpt-4", "anthropic/claude"],
+      new Map([["openai/gpt-4", 10]]),
+    )).toEqual([
+      { provider: "openai", models: [{ id: "openai/gpt-4", total: 10 }], total: 10 },
+      { provider: "anthropic", models: [{ id: "anthropic/claude", total: 0 }], total: 0 },
+    ]);
+  });
+
   test("toggles mixed groups and collapses all-selected state to null", () => {
     const available = ["openai/gpt-4", "openai/gpt-5", "anthropic/claude"];
     expect(toggleCompanionModels(["openai/gpt-4"], available, ["openai/gpt-5"], true)).toEqual(["openai/gpt-4", "openai/gpt-5"]);

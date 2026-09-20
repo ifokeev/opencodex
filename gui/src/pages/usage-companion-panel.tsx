@@ -126,10 +126,17 @@ export default function UsageCompanionPanel({
   const saveBaseline = useRef<CompanionSettings | null>(null);
   const timelineRequest = useRef<AbortController | null>(null);
   const saveStateRef = useRef(saveState);
+  const settingsRef = useRef(settings);
+  const knownTotalsRef = useRef(new Map<string, number>());
+  const [knownTotals, setKnownTotals] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     saveStateRef.current = saveState;
   }, [saveState]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const loadSettings = useCallback(async () => {
     setSettingsError(null);
@@ -157,6 +164,7 @@ export default function UsageCompanionPanel({
     if (!visible) return;
     const interval = setInterval(() => {
       if (saveStateRef.current === "saving") return;
+      if (settingsRef.current && saveBaseline.current !== settingsRef.current) return;
       void loadSettings();
     }, 60_000);
     return () => clearInterval(interval);
@@ -188,6 +196,14 @@ export default function UsageCompanionPanel({
       const next = await result.json() as UsageTimeline;
       setTimeline(next);
       setAvailableModels(next.availableModels);
+      const currentTotals = new Map<string, number>();
+      for (const series of next.series) {
+        currentTotals.set(series.id, (currentTotals.get(series.id) ?? 0) + series.total);
+      }
+      for (const [id, total] of currentTotals) {
+        knownTotalsRef.current.set(id, total);
+      }
+      setKnownTotals(new Map(knownTotalsRef.current));
     } catch (error) {
       if (!controller.signal.aborted) setTimelineError(errorMessage(error));
     } finally {
@@ -269,11 +285,7 @@ export default function UsageCompanionPanel({
   const providerNames = providers.map(provider => provider.provider).filter((provider, index, all) => all.indexOf(provider) === index).toSorted();
   const selectedModels = current.models ?? availableModels;
   const selectedModelSet = new Set(selectedModels);
-  const modelTotals = new Map<string, number>();
-  for (const series of timeline?.series ?? []) {
-    modelTotals.set(series.id, (modelTotals.get(series.id) ?? 0) + series.total);
-  }
-  const modelGroups = groupCompanionModels(availableModels, modelTotals);
+  const modelGroups = groupCompanionModels(availableModels, knownTotals);
   const hiddenProviderSet = new Set(current.hiddenProviders);
   const saveMessage = saveState === "saved" && response?.updatedAt
     ? t("usage.companion.saved", { time: formatSaveTime(response.updatedAt, locale) })
@@ -358,7 +370,7 @@ export default function UsageCompanionPanel({
                     title={model.id}
                   />
                   <code className="mono text-control">{model.id}</code>
-                  <span className="usage-companion-model-total muted text-caption">{modelTotals.has(model.id) ? formatCompanionTokens(model.total) : "—"}</span>
+                  <span className="usage-companion-model-total muted text-caption">{knownTotals.has(model.id) ? formatCompanionTokens(model.total) : "—"}</span>
                 </div>;
               })}
             </div>;
