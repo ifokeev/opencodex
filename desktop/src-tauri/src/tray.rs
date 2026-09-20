@@ -1,4 +1,4 @@
-use crate::{formatting, proxy::ProxyClient, window};
+use crate::{formatting, proxy::ProxyClient, widget, window};
 use serde_json::Value;
 use std::sync::atomic::Ordering;
 use tauri::{
@@ -102,11 +102,17 @@ pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
         .build(app)?;
 
     refresh_title(&tray, &proxy);
+    widget::refresh(&proxy);
     let tray = tray.clone();
     tauri::async_runtime::spawn(async move {
+        let mut tick = 0;
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(60)).await;
             refresh_title(&tray, &proxy);
+            tick += 1;
+            if tick % 5 == 0 {
+                widget::refresh(&proxy);
+            }
         }
     });
     Ok(())
@@ -129,7 +135,7 @@ fn refresh_title(tray: &tauri::tray::TrayIcon<Wry>, proxy: &ProxyClient) {
     });
 }
 
-fn render_title(settings: &Value, usage: &Value, quotas: &Value) -> Option<String> {
+pub(crate) fn render_title(settings: &Value, usage: &Value, quotas: &Value) -> Option<String> {
     let metric = settings
         .pointer("/settings/menuBarMetric")
         .and_then(Value::as_str)

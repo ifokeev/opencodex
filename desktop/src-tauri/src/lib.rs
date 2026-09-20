@@ -4,6 +4,7 @@ mod formatting;
 mod proxy;
 mod sidecar;
 mod tray;
+mod widget;
 mod window;
 
 use std::sync::{

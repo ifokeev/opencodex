@@ -46,8 +46,20 @@ impl ProxyClient {
         self.get("/api/usage?range=7d").await
     }
 
+    pub async fn usage_today(&self) -> Result<Value, ProxyError> {
+        self.get("/api/usage?range=today").await
+    }
+
+    pub async fn startup_health(&self) -> Result<Value, ProxyError> {
+        self.get("/api/startup-health").await
+    }
+
     pub async fn quotas(&self) -> Result<Value, ProxyError> {
         self.get("/api/provider-quotas").await
+    }
+
+    pub async fn timeline(&self, query: &str) -> Result<Value, ProxyError> {
+        self.get(&format!("/api/usage/timeline?{query}")).await
     }
 
     pub async fn stop(&self) -> Result<Value, ProxyError> {
