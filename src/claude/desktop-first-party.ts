@@ -53,6 +53,30 @@ export function resolveClaudeDesktopMode(config: DesktopModeConfig): ClaudeDeskt
 }
 
 /**
+ * Config mutation that records the applied Desktop mode. Switching to first-party also drops
+ * the gateway apply marker: the profile assignments stay for a later gateway apply, but a
+ * stale `appliedFingerprint` must not make `resolveClaudeDesktopMode` read `gateway` again
+ * should the explicit marker ever go missing.
+ */
+export function recordClaudeDesktopMode(
+  config: DesktopModeConfig,
+  mode: ClaudeDesktopMode,
+): { changed: boolean; value: true } {
+  const claudeCode = config.claudeCode ?? {};
+  const profile = claudeCode.desktopProfile;
+  const dropMarker = mode === "first-party" && profile !== undefined
+    && (profile.appliedFingerprint !== undefined || profile.appliedAt !== undefined);
+  if (claudeCode.desktopMode === mode && !dropMarker) return { changed: false, value: true };
+  if (dropMarker) {
+    const { appliedFingerprint: _fingerprint, appliedAt: _at, ...rest } = profile;
+    config.claudeCode = { ...claudeCode, desktopMode: mode, desktopProfile: rest };
+  } else {
+    config.claudeCode = { ...claudeCode, desktopMode: mode };
+  }
+  return { changed: true, value: true };
+}
+
+/**
  * Mode an *apply* without an explicit choice should use. The first-party default only holds
  * where the intercept proxy actually runs; with it disabled (or on a client role) an implied
  * first-party apply would point Claude Code at a proxy that never starts, so fall back to the

@@ -167,6 +167,13 @@ test("POST /api/claude-desktop/apply defaults to first-party and gateway mode re
   const afterBack = await dispatch("/api/claude-desktop/status", {}, afterGateway);
   expect(afterBack.body).toMatchObject({ mode: "first-party", applied: true, stale: false, drift: false, desiredEnabled: true });
   expect(["not_installed", "no_owned_state", "standard"]).toContain(afterBack.body.observedKind);
+  // The gateway apply marker goes with the profile: without the explicit mode field the
+  // saved config must still resolve to first-party, not to the gateway it just replaced.
+  const savedBack = JSON.parse(readFileSync(join(root, "config.json"), "utf8")) as OcxConfig;
+  expect(savedBack.claudeCode?.desktopProfile?.appliedFingerprint).toBeUndefined();
+  expect(savedBack.claudeCode?.desktopProfile?.appliedAt).toBeUndefined();
+  expect(savedBack.claudeCode?.desktopProfile?.assignments).toBeDefined();
+  expect(resolveClaudeDesktopMode({ claudeCode: { ...savedBack.claudeCode, desktopMode: undefined } })).toBe("first-party");
 });
 
 test("native toggle: enable applies first-party by default and disable removes the env", async () => {
@@ -200,9 +207,21 @@ test("native toggle: enabling into explicit first-party pivots an applied gatewa
   expect(settings().env?.HTTPS_PROXY).toBe("http://127.0.0.1:10200");
   const saved = JSON.parse(readFileSync(join(root, "config.json"), "utf8")) as OcxConfig;
   expect(saved.claudeCode?.desktopMode).toBe("first-party");
+  expect(saved.claudeCode?.desktopProfile?.appliedFingerprint).toBeUndefined();
   const status = await dispatch("/api/claude-desktop/status", {}, chosen);
   expect(status.body).toMatchObject({ mode: "first-party", applied: true, drift: false });
   expect(["not_installed", "no_owned_state", "standard"]).toContain(status.body.observedKind);
+});
+
+test("native toggle: enabling into gateway saves the gateway mode marker like the apply route", async () => {
+  const chosen = config({ claudeCode: { desktopMode: "gateway" } });
+  writeFileSync(join(root, "config.json"), JSON.stringify(chosen));
+  const enabled = await dispatch("/api/native-integrations/claude-desktop", { method: "PUT", body: JSON.stringify({ enabled: true }) }, chosen);
+  expect(enabled.status).toBe(200);
+  expect(enabled.body).toMatchObject({ ok: true, state: "current", message: "Claude Desktop integration enabled." });
+  expect(existsSync(join(claudeDir, "settings.json"))).toBe(false);
+  const saved = JSON.parse(readFileSync(join(root, "config.json"), "utf8")) as OcxConfig;
+  expect(saved.claudeCode?.desktopMode).toBe("gateway");
 });
 
 test("ensure warns instead of touching a gateway profile that contradicts an explicit first-party marker", () => {

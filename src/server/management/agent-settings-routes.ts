@@ -131,17 +131,14 @@ function persistDesktopProfileField(
   return { ok: true };
 }
 
-function persistDesktopModeField(
+async function persistDesktopModeField(
   config: OcxConfig,
-  desktopMode: NonNullable<OcxConfig["claudeCode"]>["desktopMode"],
-): { ok: true } | { ok: false; reason: "missing" | "invalid" | "conflict" } {
-  const outcome = mutatePersistedConfig(persisted => {
-    if (persisted.claudeCode?.desktopMode === desktopMode) return { changed: false, value: true };
-    persisted.claudeCode = { ...(persisted.claudeCode ?? {}), desktopMode };
-    return { changed: true, value: true };
-  });
+  desktopMode: "first-party" | "gateway",
+): Promise<{ ok: true } | { ok: false; reason: "missing" | "invalid" | "conflict" }> {
+  const { recordClaudeDesktopMode } = await import("../../claude/desktop-first-party");
+  const outcome = mutatePersistedConfig(persisted => recordClaudeDesktopMode(persisted, desktopMode));
   if (outcome.status === "unavailable") return { ok: false, reason: outcome.reason };
-  config.claudeCode = { ...(config.claudeCode ?? {}), desktopMode };
+  recordClaudeDesktopMode(config, desktopMode);
   return { ok: true };
 }
 
@@ -1087,7 +1084,7 @@ export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise
             path: applied.path,
           }, applied.reason === "foreign_env" || applied.reason === "intercept_disabled" ? 409 : 500);
         }
-        const modeSaved = persistDesktopModeField(config, "first-party");
+        const modeSaved = await persistDesktopModeField(config, "first-party");
         return jsonResponse({
           ok: true,
           mode: "first-party",
@@ -1161,7 +1158,7 @@ export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise
         nativeContextLimits(latest),
       );
       if (!result.written) return jsonResponse({ error: result.reason ?? "Claude Desktop apply failed", saved: true, path: result.path }, 500);
-      const modeSaved = persistDesktopModeField(config, "gateway");
+      const modeSaved = await persistDesktopModeField(config, "gateway");
       const modeWarning = modeSaved.ok ? undefined : `Claude Desktop was applied, but the gateway mode marker was not saved (${modeSaved.reason}).`;
       const { claudeDesktopPolicyWarning, probeClaudeDesktopPolicy } = await import("../../claude/desktop-policy");
       const policyState = (deps.probeClaudeDesktopPolicy ?? probeClaudeDesktopPolicy)({

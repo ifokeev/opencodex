@@ -28,8 +28,10 @@ import { inspectDesktop3pConfigLibrary, removeDesktop3pStandardPivot, writeDeskt
 import {
   applyDesktopFirstParty,
   inspectDesktopFirstParty,
+  recordClaudeDesktopMode,
   removeDesktopFirstParty,
   resolveClaudeDesktopApplyMode,
+  type ClaudeDesktopMode,
 } from "../../claude/desktop-first-party";
 import { projectGrokCatalog } from "../../grok/catalog";
 import { injectGrokConfig, stripGrokConfig } from "../../grok/inject";
@@ -632,12 +634,8 @@ export function firstPartyRefusalMessage(
 }
 
 /** Record which Desktop mode is applied; `false` when the config file could not be updated. */
-function persistDesktopModeMarker(desktopMode: NonNullable<OcxConfig["claudeCode"]>["desktopMode"]): boolean {
-  const outcome = mutatePersistedConfig(persisted => {
-    if (persisted.claudeCode?.desktopMode === desktopMode) return { changed: false, value: true };
-    persisted.claudeCode = { ...(persisted.claudeCode ?? {}), desktopMode };
-    return { changed: true, value: true };
-  });
+function persistDesktopModeMarker(desktopMode: ClaudeDesktopMode): boolean {
+  const outcome = mutatePersistedConfig(persisted => recordClaudeDesktopMode(persisted, desktopMode));
   return outcome.status !== "unavailable";
 }
 
@@ -750,9 +748,13 @@ async function handleClaudeDesktopToggle(ctx: ManagementContext): Promise<Respon
         nativeContextLimits(latest),
       );
       if (!result.written) return postCommitRefusal(500, "claude-desktop", "write_failed", "Claude Desktop apply failed.", { desiredEnabled: latestDesiredEnabled });
+      const modeSaved = persistDesktopModeMarker("gateway");
       return jsonResponse({
         ok: true, clientId: "claude-desktop", changed: true, state: "current", desiredEnabled: latestDesiredEnabled,
-        message: "Claude Desktop integration enabled.",
+        message: [
+          "Claude Desktop integration enabled.",
+          modeSaved ? "" : "The gateway mode marker could not be saved to config; status may report the mode as unsaved.",
+        ].filter(Boolean).join(" "),
       } satisfies NativeToggleEnvelope);
     } catch {
       return postCommitRefusal(500, "claude-desktop", "write_failed", "Claude Desktop apply failed.", { desiredEnabled });

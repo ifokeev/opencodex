@@ -18,6 +18,7 @@ import {
 import { inspectDesktop3pConfigLibrary, removeDesktop3pStandardPivot, writeDesktop3pConfig, type Desktop3pConfigMode, parseDesktop3pModeArgs } from "../claude/desktop-3p";
 import {
   applyDesktopFirstParty,
+  recordClaudeDesktopMode,
   removeDesktopFirstParty,
   resolveClaudeDesktopApplyMode,
   type ClaudeDesktopMode,
@@ -151,11 +152,7 @@ async function applyConnectedDesktopProfile(
 function saveDesktopMode(mode: ClaudeDesktopMode, deps: ApplyProfileDeps): boolean {
   try {
     return withClientLifecycleSync(() => {
-      const outcome = mutatePersistedConfig(current => {
-        if (current.claudeCode?.desktopMode === mode) return { changed: false, value: true };
-        current.claudeCode = { ...(current.claudeCode ?? {}), desktopMode: mode };
-        return { changed: true, value: true };
-      });
+      const outcome = mutatePersistedConfig(current => recordClaudeDesktopMode(current, mode));
       return outcome.status !== "unavailable";
     }, deps.lifecycleLockDeps);
   } catch {
