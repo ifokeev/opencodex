@@ -171,9 +171,15 @@ final class MetricsView: NSView {
             columns[1].value.stringValue = (summary?.hasEstimates ?? false) ? requests + "~" : requests
             columns[2].value.stringValue = Format.cost(summary?.estimatedCostUsd)
             columns[0].value.setAccessibilityLabel(
+                "\(Format.tokens(summary?.totalTokens)) tokens"
+            )
+            columns[1].value.setAccessibilityLabel(
                 (summary?.hasEstimates ?? false)
                     ? "\(requests) requests, partly estimated"
                     : "\(requests) requests"
+            )
+            columns[2].value.setAccessibilityLabel(
+                "\(Format.cost(summary?.estimatedCostUsd)) estimated cost"
             )
         }
     }

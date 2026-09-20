@@ -125,6 +125,7 @@ public final class PopoverPanel: NSPanel {
 private enum PopoverSurface {
     static func make(content: NSView) -> NSView {
         let surface: NSView
+#if compiler(>=6.2)
         if #available(macOS 26, *) {
             let glass = NSGlassEffectView()
             glass.cornerRadius = 16
@@ -132,16 +133,11 @@ private enum PopoverSurface {
             glass.contentView = content
             surface = glass
         } else {
-            let effect = NSVisualEffectView()
-            effect.material = .popover
-            effect.blendingMode = .behindWindow
-            effect.state = .active
-            effect.wantsLayer = true
-            effect.layer?.cornerRadius = 10
-            effect.layer?.masksToBounds = true
-            effect.addSubview(content)
-            surface = effect
+            surface = makeMaterialSurface(content: content)
         }
+#else
+        surface = makeMaterialSurface(content: content)
+#endif
 
         let host = NSView()
         host.addSubview(surface)
@@ -158,5 +154,17 @@ private enum PopoverSurface {
             content.bottomAnchor.constraint(equalTo: surface.bottomAnchor),
         ])
         return host
+    }
+
+    private static func makeMaterialSurface(content: NSView) -> NSView {
+        let effect = NSVisualEffectView()
+        effect.material = .popover
+        effect.blendingMode = .behindWindow
+        effect.state = .active
+        effect.wantsLayer = true
+        effect.layer?.cornerRadius = 10
+        effect.layer?.masksToBounds = true
+        effect.addSubview(content)
+        return effect
     }
 }

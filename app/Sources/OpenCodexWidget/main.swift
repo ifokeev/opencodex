@@ -1,6 +1,2 @@
-import SwiftUI
-import WidgetKit
-
-if #available(macOS 14, *) {
-    OpenCodexWidgetBundle.main()
-}
+// WidgetKit enters through _NSExtensionMain; this file keeps the executable target's
+// source directory populated without adding a competing Swift-generated main.
