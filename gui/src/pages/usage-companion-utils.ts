@@ -51,6 +51,9 @@ export interface CompanionSettingsResponse {
   updatedAt: number | null;
   defaults: CompanionSettings;
   corrupt?: boolean;
+  companion?: {
+    lastSeenAt: number | null;
+  };
 }
 
 export const CHART_BUCKET_MINUTES: Record<ChartHours, number> = {

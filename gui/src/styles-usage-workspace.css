@@ -227,6 +227,21 @@
 }
 .usage-companion-header .panel-title { margin: 0; }
 .usage-companion-header .card-sub { margin: 4px 0 0; }
+.usage-companion-install {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.usage-companion-install summary { cursor: pointer; color: var(--text); font-size: 12px; font-weight: 600; }
+.usage-companion-install-status { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 12px; }
+.usage-companion-install-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+.usage-companion-install-steps { display: grid; gap: 8px; margin: 0; padding-left: 20px; color: var(--muted); font-size: 12px; }
+.usage-companion-install-steps .btn { margin-left: 6px; }
+.usage-companion-install-last-seen { margin: 0; }
+.usage-companion-install-command { display: block; overflow-x: auto; padding: 7px 9px; border-radius: var(--radius-xs); background: var(--raised); color: var(--text); font-size: 11px; }
 .usage-companion-chart { min-width: 0; }
 .usage-companion-chart svg { display: block; width: 100%; height: 160px; overflow: visible; }
 .usage-companion-axis { stroke: var(--border); stroke-width: 1; }

@@ -8,6 +8,7 @@ import {
   loadCompanionSettings,
   saveCompanionSettings,
 } from "../../src/companion/settings";
+import { resetCompanionPresenceForTests } from "../../src/server/management/companion-routes";
 import { handleManagementAPI } from "../../src/server/management-api";
 import type { OcxConfig } from "../../src/types";
 
@@ -21,11 +22,15 @@ async function withHome<T>(run: (home: string) => Promise<T> | T): Promise<T> {
     rmSync(home, { recursive: true, force: true });
   }
 }
-async function call(method: string, body?: unknown): Promise<{ status: number; body: any }> {
+async function call(method: string, body?: unknown, userAgent?: string): Promise<{ status: number; body: any }> {
   const url = new URL("http://127.0.0.1:10100/api/companion/settings");
   const req = new Request(url, {
     method,
-    headers: { host: "127.0.0.1:10100", ...(body === undefined ? {} : { "content-type": "application/json" }) },
+    headers: {
+      host: "127.0.0.1:10100",
+      ...(userAgent ? { "user-agent": userAgent } : {}),
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const response = await handleManagementAPI(req, url, config, {}, "admin-token");
@@ -64,6 +69,18 @@ describe("companion settings", () => {
       expect(result.status).toBe(200);
       expect(result.body.corrupt).toBe(true);
       expect(readFileSync(join(home, "companion.json"), "utf8")).toBe("{");
+    });
+  });
+
+  test("GET records menu bar presence only for the companion user agent", async () => {
+    await withHome(async () => {
+      resetCompanionPresenceForTests();
+      const initial = await call("GET");
+      expect(initial.body.companion.lastSeenAt).toBeNull();
+      const ordinary = await call("GET", undefined, "Mozilla/5.0");
+      expect(ordinary.body.companion.lastSeenAt).toBeNull();
+      const companion = await call("GET", undefined, "OpenCodexMenuBar/2.60.0");
+      expect(companion.body.companion.lastSeenAt).toBeNumber();
     });
   });
 });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useI18n } from "../i18n/shared";
+import { relativeTimeLabelsFromT, formatRelativeTime } from "../provider-workspace/usage";
 import { UsageCompanionChart } from "./usage-companion-chart";
 import {
   bucketMinutesForWindow,
@@ -264,6 +265,36 @@ export default function UsageCompanionPanel({
         </div>
         <a className="btn btn-ghost btn-sm" href="https://opencodex.me/guides/macos-menu-bar/" target="_blank" rel="noreferrer">{t("usage.companion.installGuide")}</a>
       </div>
+      {(() => {
+        const lastSeenAt = response?.companion?.lastSeenAt ?? null;
+        const connected = lastSeenAt !== null && Date.now() - lastSeenAt <= 10 * 60 * 1000;
+        const age = lastSeenAt === null ? null : formatRelativeTime(lastSeenAt, relativeTimeLabelsFromT(t));
+        const steps = (
+          <ol className="usage-companion-install-steps">
+            <li>{t("usage.companion.installStep1")} <a className="btn btn-ghost btn-sm" href="https://github.com/lidge-jun/opencodex/releases/latest" target="_blank" rel="noreferrer">{t("common.github")}</a></li>
+            <li>{t("usage.companion.installStep2")}</li>
+            <li>{t("usage.companion.installStep3")}</li>
+          </ol>
+        );
+        return connected ? (
+          <div className="usage-companion-install usage-companion-install--connected">
+            <div className="usage-companion-install-status"><span className="usage-companion-install-dot" aria-hidden="true" />{t("usage.companion.connected", { age })}</div>
+            <details>
+              <summary>{t("usage.companion.installAnother")}</summary>
+              {steps}
+              <code className="usage-companion-install-command">xattr -d com.apple.quarantine /Applications/OpenCodex.app</code>
+            </details>
+          </div>
+        ) : (
+          <details className="usage-companion-install" open>
+            <summary>{t("usage.companion.installTitle")}</summary>
+            {lastSeenAt !== null && <p className="usage-companion-install-last-seen muted text-caption">{t("usage.companion.lastSeen", { age })}</p>}
+            {lastSeenAt === null && <p className="usage-companion-install-last-seen muted text-caption">{t("usage.companion.notConnected")}</p>}
+            {steps}
+            <code className="usage-companion-install-command">xattr -d com.apple.quarantine /Applications/OpenCodex.app</code>
+          </details>
+        );
+      })()}
       <UsageCompanionChart timeline={timeline} chartStyle={current.chartStyle} hours={current.chartHours} loading={timelineLoading} error={timelineError} onRetry={() => void loadTimeline()} locale={locale} t={t} />
       <fieldset className="usage-companion-controls" disabled={response?.corrupt}>
         <Segment label={t("usage.companion.menuBarShows")} value={current.menuBarMetric} options={MENU_METRICS} optionLabel={value => t(`usage.companion.menu${value[0]!.toUpperCase()}${value.slice(1)}` as never)} onChange={value => updateSettings({ menuBarMetric: value })} />
