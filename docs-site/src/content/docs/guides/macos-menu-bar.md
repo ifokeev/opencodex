@@ -9,6 +9,13 @@ per-provider quota pressure, without opening the dashboard.
 It is a separate application from the proxy. `ocx` keeps running as it always has; the
 companion is a read-mostly client that talks to the local management API.
 
+## Desktop app (Tauri)
+
+The same dashboard can run inside the OpenCodex desktop app. The Usage companion panel
+uses the OS selector to show the matching macOS, Windows, or Linux installation steps.
+While the dashboard is inside the desktop shell, choose **Open in browser** to open the
+current dashboard view in your normal browser.
+
 ## Install
 
 Download `OpenCodex-<version>-macos-universal.zip` from the

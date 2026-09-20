@@ -3,6 +3,7 @@ import { useI18n } from "../i18n/shared";
 import { relativeTimeLabelsFromT, formatRelativeTime } from "../provider-workspace/usage";
 import { Switch } from "../ui";
 import { UsageCompanionChart } from "./usage-companion-chart";
+import { desktopShellVersion, hostOs, isDesktopShell, type HostOs } from "../lib/desktop-shell";
 import {
   bucketMinutesForWindow,
   buildCompanionSettingsPatch,
@@ -129,6 +130,10 @@ export default function UsageCompanionPanel({
   const settingsRef = useRef(settings);
   const knownTotalsRef = useRef(new Map<string, number>());
   const [knownTotals, setKnownTotals] = useState<Map<string, number>>(new Map());
+  const [installOs, setInstallOs] = useState<HostOs>(() => {
+    const detected = hostOs();
+    return detected === "unknown" ? "macos" : detected;
+  });
 
   useEffect(() => {
     saveStateRef.current = saveState;
@@ -275,6 +280,20 @@ export default function UsageCompanionPanel({
     }
   }, [apiBase, loadSettings]);
 
+  const openInBrowser = useCallback(async () => {
+    try {
+      const path = location.hash ? `/${location.hash}` : "/#/usage";
+      const result = await fetch(`${apiBase}/api/companion/open-in-browser`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ path }),
+      });
+      if (!result.ok) throw new Error(`${result.status} ${result.statusText}`.trim());
+    } catch (error) {
+      setSaveError(errorMessage(error));
+    }
+  }, [apiBase]);
+
   if (settingsError) {
     return <section ref={rootRef} className="usage-companion-panel"><p role="alert">{t("usage.companion.settingsUnavailable")}</p><button type="button" className="btn btn-ghost btn-sm" onClick={() => void loadSettings()}>{t("common.retry")}</button></section>;
   }
@@ -307,20 +326,38 @@ export default function UsageCompanionPanel({
         const lastSeenAt = response?.companion?.lastSeenAt ?? null;
         const connected = lastSeenAt !== null && fetchedAt !== null && fetchedAt - lastSeenAt <= 10 * 60 * 1000;
         const age = lastSeenAt === null || fetchedAt === null ? "" : formatRelativeTime(lastSeenAt, relativeTimeLabelsFromT(t), fetchedAt);
+        const shell = isDesktopShell();
+        const shellVersion = desktopShellVersion() ?? __APP_VERSION__;
         const steps = (
           <ol className="usage-companion-install-steps">
-            <li>{t("usage.companion.installStep1")} <a className="btn btn-ghost btn-sm" href="https://github.com/lidge-jun/opencodex/releases/latest" target="_blank" rel="noreferrer">{t("common.github")}</a></li>
-            <li>{t("usage.companion.installStep2")}</li>
-            <li>{t("usage.companion.installStep3")}</li>
+            <li>{t(`usage.companion.install${installOs === "macos" ? "Mac" : installOs === "windows" ? "Win" : "Linux"}Step1` as never)} <a className="btn btn-ghost btn-sm" href="https://github.com/lidge-jun/opencodex/releases/latest" target="_blank" rel="noreferrer">{t("common.github")}</a></li>
+            <li>{t(`usage.companion.install${installOs === "macos" ? "Mac" : installOs === "windows" ? "Win" : "Linux"}Step2` as never)}</li>
+            <li>{t(`usage.companion.install${installOs === "macos" ? "Mac" : installOs === "windows" ? "Win" : "Linux"}Step3` as never)}</li>
           </ol>
         );
+        const installCommand = installOs === "macos"
+          ? <code className="usage-companion-install-command">xattr -d com.apple.quarantine /Applications/OpenCodex.app</code>
+          : installOs === "linux"
+            ? <code className="usage-companion-install-command">chmod +x OpenCodex-*.AppImage</code>
+            : null;
+        if (shell) {
+          return (
+            <div className="usage-companion-install usage-companion-install--shell">
+              <p>{t("usage.companion.runningInDesktop", { version: shellVersion })}</p>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => void openInBrowser()}>{t("usage.companion.openInBrowser")}</button>
+            </div>
+          );
+        }
         return connected ? (
           <div className="usage-companion-install usage-companion-install--connected">
-            <div className="usage-companion-install-status"><span className="usage-companion-install-dot" aria-hidden="true" />{t("usage.companion.connected", { age })}</div>
+            <div className="usage-companion-install-status"><span className="usage-companion-install-dot" aria-hidden="true" />{t(response?.companion?.kind === "desktop" ? "usage.companion.connectedDesktop" : "usage.companion.connected", { age })}</div>
             <details>
               <summary>{t("usage.companion.installAnother")}</summary>
+              <div className="usage-segmented" role="group" aria-label={t("usage.companion.installOs")}>
+                {(["macos", "windows", "linux"] as const).map(os => <button key={os} type="button" className="btn btn-ghost btn-sm" aria-pressed={installOs === os} onClick={() => setInstallOs(os)}>{t(`usage.companion.os${os === "macos" ? "Mac" : os === "windows" ? "Windows" : "Linux"}` as never)}</button>)}
+              </div>
               {steps}
-              <code className="usage-companion-install-command">xattr -d com.apple.quarantine /Applications/OpenCodex.app</code>
+              {installCommand}
             </details>
           </div>
         ) : (
@@ -328,8 +365,11 @@ export default function UsageCompanionPanel({
             <summary>{t("usage.companion.installTitle")}</summary>
             {lastSeenAt !== null && <p className="usage-companion-install-last-seen muted text-caption">{t("usage.companion.lastSeen", { age })}</p>}
             {lastSeenAt === null && <p className="usage-companion-install-last-seen muted text-caption">{t("usage.companion.notConnected")}</p>}
+            <div className="usage-segmented" role="group" aria-label={t("usage.companion.installOs")}>
+              {(["macos", "windows", "linux"] as const).map(os => <button key={os} type="button" className="btn btn-ghost btn-sm" aria-pressed={installOs === os} onClick={() => setInstallOs(os)}>{t(`usage.companion.os${os === "macos" ? "Mac" : os === "windows" ? "Windows" : "Linux"}` as never)}</button>)}
+            </div>
             {steps}
-            <code className="usage-companion-install-command">xattr -d com.apple.quarantine /Applications/OpenCodex.app</code>
+            {installCommand}
           </details>
         );
       })()}
