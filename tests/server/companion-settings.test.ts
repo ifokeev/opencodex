@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,9 +8,16 @@ import {
   loadCompanionSettings,
   saveCompanionSettings,
 } from "../../src/companion/settings";
-import { resetCompanionPresenceForTests } from "../../src/server/management/companion-routes";
-import { handleManagementAPI } from "../../src/server/management-api";
 import type { OcxConfig } from "../../src/types";
+
+const opened: string[] = [];
+mock.module("../../src/lib/open-url", () => ({
+  openUrl: (url: string) => {
+    opened.push(url);
+  },
+}));
+const { resetCompanionPresenceForTests } = await import("../../src/server/management/companion-routes");
+const { handleManagementAPI } = await import("../../src/server/management-api");
 
 const config = { port: 10100, defaultProvider: "openai", providers: {} } as OcxConfig;
 async function withHome<T>(run: (home: string) => Promise<T> | T): Promise<T> {
@@ -94,14 +101,17 @@ describe("companion settings", () => {
 
   test("opens only validated local dashboard paths in the browser", async () => {
     await withHome(async () => {
+      opened.length = 0;
       for (const path of ["https://x", "//x", 42]) {
         const result = await callPath("/api/companion/open-in-browser", "POST", { path });
         expect(result.status).toBe(400);
         expect(result.body).toEqual({ error: "invalid path" });
+        expect(opened).toEqual([]);
       }
       const result = await callPath("/api/companion/open-in-browser", "POST", { path: "/#/usage" });
       expect(result.status).toBe(200);
       expect(result.body).toEqual({ ok: true, url: "http://127.0.0.1:10100/#/usage" });
+      expect(opened).toEqual(["http://127.0.0.1:10100/#/usage"]);
     });
   });
 });

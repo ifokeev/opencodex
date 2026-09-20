@@ -2,7 +2,14 @@ use crate::{auth::Auth, discovery::ProxyEndpoint};
 use tauri::{AppHandle, Manager, Url, WebviewWindow, WindowEvent};
 
 pub fn webview_user_agent() -> String {
-    format!("Mozilla/5.0 {}", Auth::user_agent())
+    let platform = if cfg!(target_os = "macos") {
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)"
+    } else if cfg!(target_os = "windows") {
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"
+    } else {
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)"
+    };
+    format!("{platform} {}", Auth::user_agent())
 }
 
 pub fn configure(window: &WebviewWindow) {
@@ -70,5 +77,12 @@ mod tests {
         let user_agent = webview_user_agent();
         assert!(user_agent.starts_with("Mozilla/5.0 "));
         assert!(user_agent.contains("OpenCodexDesktop/"));
+        if cfg!(target_os = "macos") {
+            assert!(user_agent.contains("(Macintosh; Intel Mac OS X 10_15_7)"));
+        } else if cfg!(target_os = "windows") {
+            assert!(user_agent.contains("(Windows NT 10.0; Win64; x64)"));
+        } else {
+            assert!(user_agent.contains("(X11; Linux x86_64)"));
+        }
     }
 }
