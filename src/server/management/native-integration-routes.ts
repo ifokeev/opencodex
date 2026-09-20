@@ -18,7 +18,7 @@
  * 011 (Claude Code), 012 (Grok).
  */
 import { join } from "node:path";
-import { loadConfig, saveConfigPreservingClaudeCode } from "../../config";
+import { loadConfig, mutatePersistedConfig, saveConfigPreservingClaudeCode } from "../../config";
 import { readRuntimePort } from "../../config/process-state";
 import { desktopVisibleNativeSlugs, filterCatalogVisibleModels, nativeContextLimits } from "../../codex/catalog";
 import { getCodexHome } from "../../codex/paths";
@@ -631,6 +631,16 @@ export function firstPartyRefusalMessage(
   }
 }
 
+/** Record which Desktop mode is applied; `false` when the config file could not be updated. */
+function persistDesktopModeMarker(desktopMode: NonNullable<OcxConfig["claudeCode"]>["desktopMode"]): boolean {
+  const outcome = mutatePersistedConfig(persisted => {
+    if (persisted.claudeCode?.desktopMode === desktopMode) return { changed: false, value: true };
+    persisted.claudeCode = { ...(persisted.claudeCode ?? {}), desktopMode };
+    return { changed: true, value: true };
+  });
+  return outcome.status !== "unavailable";
+}
+
 let claudeDesktopToggleFlight: Promise<Response> | null = null;
 
 async function handleClaudeDesktopToggle(ctx: ManagementContext): Promise<Response> {
@@ -681,17 +691,39 @@ async function handleClaudeDesktopToggle(ctx: ManagementContext): Promise<Respon
     }
 
     if (resolveClaudeDesktopApplyMode(current) === "first-party") {
+      // Same contract as POST /api/claude-desktop/apply: an owned gateway profile left on disk
+      // is pivoted to standard first, so the two modes are never active together.
+      const library = inspectDesktop3pConfigLibrary({ appliedFingerprint: fingerprint });
+      let gatewayRemoved = false;
+      if (library.kind === "gateway_ours" || library.kind === "gateway_drifted") {
+        const removed = (ctx.deps.removeDesktop3pStandardPivot ?? removeDesktop3pStandardPivot)({ appliedFingerprint: fingerprint, replaceWhileEnabled: true });
+        if (removed.kind === "cleanup_incomplete") {
+          return postCommitRefusal(500, "claude-desktop", "cleanup_incomplete",
+            "Claude Desktop now points at standard mode, but gateway credential cleanup is incomplete; first-party env was not applied.",
+            { desiredEnabled, residualPaths: removed.residualPaths ?? [] });
+        }
+        if (!removed.ok) {
+          return postCommitRefusal(409, "claude-desktop", removed.reason === "metadata_unreadable" ? "metadata_unreadable" : "write_failed",
+            "The gateway profile could not be removed safely, so first-party mode was not applied.", { desiredEnabled });
+        }
+        gatewayRemoved = removed.changed;
+      }
       const applied = applyDesktopFirstParty(current);
       if (!applied.ok) {
         const reason = applied.reason === "foreign_env" || applied.reason === "intercept_disabled" ? applied.reason : "write_failed";
         return postCommitRefusal(applied.reason === "unreadable" || applied.reason === "ca_unavailable" ? 500 : 409, "claude-desktop", reason,
           firstPartyRefusalMessage(applied.reason, applied.path), { desiredEnabled });
       }
+      const modeSaved = persistDesktopModeMarker("first-party");
+      const changed = applied.changed || gatewayRemoved;
       return jsonResponse({
-        ok: true, clientId: "claude-desktop", changed: applied.changed, state: "current", desiredEnabled,
-        message: applied.changed
-          ? "Claude Desktop integration enabled (first-party). Fully quit and reopen Claude Desktop."
-          : "Claude Desktop integration is already on.",
+        ok: true, clientId: "claude-desktop", changed, state: "current", desiredEnabled,
+        message: [
+          changed
+            ? "Claude Desktop integration enabled (first-party). Fully quit and reopen Claude Desktop."
+            : "Claude Desktop integration is already on.",
+          modeSaved ? "" : "The first-party mode marker could not be saved to config; status may report the mode as unsaved.",
+        ].filter(Boolean).join(" "),
       } satisfies NativeToggleEnvelope);
     }
 

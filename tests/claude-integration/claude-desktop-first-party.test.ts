@@ -185,6 +185,42 @@ test("native toggle: enable applies first-party by default and disable removes t
   expect(settings().env?.HTTPS_PROXY).toBeUndefined();
 });
 
+test("native toggle: enabling into explicit first-party pivots an applied gateway profile and saves the mode marker", async () => {
+  const gateway = await dispatch("/api/claude-desktop/apply", { method: "POST", body: JSON.stringify({ mode: "gateway" }) });
+  expect(gateway.status).toBe(200);
+  const afterGateway = JSON.parse(readFileSync(join(root, "config.json"), "utf8")) as OcxConfig;
+  expect(afterGateway.claudeCode?.desktopProfile?.appliedFingerprint).toBeTruthy();
+  // The operator chose first-party in config while the gateway profile is still on disk.
+  const chosen = { ...afterGateway, claudeCode: { ...afterGateway.claudeCode, desktopMode: "first-party" as const } };
+  writeFileSync(join(root, "config.json"), JSON.stringify(chosen));
+
+  const enabled = await dispatch("/api/native-integrations/claude-desktop", { method: "PUT", body: JSON.stringify({ enabled: true }) }, chosen);
+  expect(enabled.status).toBe(200);
+  expect(enabled.body).toMatchObject({ ok: true, changed: true, state: "current", desiredEnabled: true });
+  expect(settings().env?.HTTPS_PROXY).toBe("http://127.0.0.1:10200");
+  const saved = JSON.parse(readFileSync(join(root, "config.json"), "utf8")) as OcxConfig;
+  expect(saved.claudeCode?.desktopMode).toBe("first-party");
+  const status = await dispatch("/api/claude-desktop/status", {}, chosen);
+  expect(status.body).toMatchObject({ mode: "first-party", applied: true, drift: false });
+  expect(["not_installed", "no_owned_state", "standard"]).toContain(status.body.observedKind);
+});
+
+test("ensure warns instead of touching a gateway profile that contradicts an explicit first-party marker", () => {
+  const logs: string[] = [];
+  const deps = {
+    loadConfig: () => config({ claudeCode: { desktopMode: "first-party" } }),
+    stripGrokConfig: () => ({ ok: true, changed: false, message: "" }),
+    syncGrokConfig: async () => ({ ok: true, changed: false, message: "" }),
+    removeDesktop3pStandardPivot: () => { throw new Error("must not pivot from ensure"); },
+    inspectDesktop3pConfigLibrary: () => ({ kind: "gateway_ours" as const, libraryPath: library, activeProfilePath: null, ownedFiles: [] }),
+    applyDesktopFirstParty: () => { throw new Error("must not apply over a live gateway"); },
+    log: (message: string) => { logs.push(message); },
+    error: (message: string) => { logs.push(message); },
+  };
+  ensureClaudeDesktopMatchesDesired(deps as unknown as Parameters<typeof ensureClaudeDesktopMatchesDesired>[0]);
+  expect(logs.some(line => line.includes("gateway profile is still applied"))).toBe(true);
+});
+
 test("ensure reconciles first-party env: refreshes when ON and stale, removes when OFF", () => {
   const applied = applyDesktopFirstParty(config({ port: 10300 }));
   expect(applied.ok).toBe(true);

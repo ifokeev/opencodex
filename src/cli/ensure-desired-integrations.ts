@@ -140,7 +140,12 @@ export function ensureClaudeDesktopMatchesDesired(
     const library = (deps.inspectDesktop3pConfigLibrary ?? inspectDesktop3pConfigLibrary)({
       appliedFingerprint: config.claudeCode?.desktopProfile?.appliedFingerprint ?? null,
     });
-    if (library.kind === "gateway_ours" || library.kind === "gateway_drifted") return;
+    if (library.kind === "gateway_ours" || library.kind === "gateway_drifted") {
+      // The mode marker and the disk disagree. Replacing a live Desktop profile is an operator
+      // action, not something an update hook should do silently.
+      error("⚠️  Claude Desktop mode is first-party but a gateway profile is still applied; run `ocx claude desktop apply --first-party` (or `--gateway`) to reconcile.");
+      return;
+    }
     const seen = (deps.inspectDesktopFirstParty ?? inspectDesktopFirstParty)(config);
     if (!seen.stale) return;
     const applied = (deps.applyDesktopFirstParty ?? applyDesktopFirstParty)(config);

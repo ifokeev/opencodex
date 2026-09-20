@@ -1161,7 +1161,8 @@ export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise
         nativeContextLimits(latest),
       );
       if (!result.written) return jsonResponse({ error: result.reason ?? "Claude Desktop apply failed", saved: true, path: result.path }, 500);
-      persistDesktopModeField(config, "gateway");
+      const modeSaved = persistDesktopModeField(config, "gateway");
+      const modeWarning = modeSaved.ok ? undefined : `Claude Desktop was applied, but the gateway mode marker was not saved (${modeSaved.reason}).`;
       const { claudeDesktopPolicyWarning, probeClaudeDesktopPolicy } = await import("../../claude/desktop-policy");
       const policyState = (deps.probeClaudeDesktopPolicy ?? probeClaudeDesktopPolicy)({
         platform: deps.platform ?? process.platform,
@@ -1185,20 +1186,22 @@ export async function handleAgentSettingsRoutes(ctx: ManagementContext): Promise
             fingerprint: result.fingerprint,
             warning: [
               `Claude Desktop was applied, but the applied marker was not saved (${marked.reason}).`,
+              modeWarning,
               policyWarning,
             ].filter(Boolean).join(" "),
           });
         }
       }
+      const warning = [modeWarning, policyWarning].filter(Boolean).join(" ");
       return jsonResponse({
         ok: true,
         mode: "gateway",
-        saved: true,
+        saved: modeSaved.ok,
         applied: true,
         path: result.path,
         fingerprint: result.fingerprint,
         policyState,
-        ...(policyWarning ? { warning: policyWarning } : {}),
+        ...(warning ? { warning } : {}),
       });
     } catch (error) {
       rethrowManagementBodyTooLarge(error);
