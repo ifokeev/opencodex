@@ -120,11 +120,16 @@ export default function UsageCompanionPanel({
   const [timelineError, setTimelineError] = useState<string | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [renderedAt] = useState(() => Date.now());
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveBaseline = useRef<CompanionSettings | null>(null);
   const timelineRequest = useRef<AbortController | null>(null);
+  const saveStateRef = useRef(saveState);
+
+  useEffect(() => {
+    saveStateRef.current = saveState;
+  }, [saveState]);
 
   const loadSettings = useCallback(async () => {
     setSettingsError(null);
@@ -133,6 +138,7 @@ export default function UsageCompanionPanel({
       if (!result.ok) throw new Error(`${result.status} ${result.statusText}`.trim());
       const next = await result.json() as CompanionSettingsResponse;
       setResponse(next);
+      setFetchedAt(Date.now());
       setSettings(next.settings);
       saveBaseline.current = next.settings;
       onSettingsLoaded?.(next.settings.menuBarMetric);
@@ -146,6 +152,15 @@ export default function UsageCompanionPanel({
     const timer = setTimeout(() => void loadSettings(), 0);
     return () => clearTimeout(timer);
   }, [loadSettings, response, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const interval = setInterval(() => {
+      if (saveStateRef.current === "saving") return;
+      void loadSettings();
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [loadSettings, visible]);
 
   const chartQuery = useMemo(() => {
     if (!settings) return null;
@@ -212,6 +227,7 @@ export default function UsageCompanionPanel({
         const body = await result.json() as CompanionSettingsResponse | { error?: string };
         if (!result.ok) throw new Error(body && "error" in body && body.error ? body.error : `${result.status} ${result.statusText}`.trim());
         setResponse(body as CompanionSettingsResponse);
+        setFetchedAt(Date.now());
         setSettings((body as CompanionSettingsResponse).settings);
         saveBaseline.current = (body as CompanionSettingsResponse).settings;
         setSaveState("saved");
@@ -277,8 +293,8 @@ export default function UsageCompanionPanel({
       </div>
       {(() => {
         const lastSeenAt = response?.companion?.lastSeenAt ?? null;
-        const connected = lastSeenAt !== null && renderedAt - lastSeenAt <= 10 * 60 * 1000;
-        const age = lastSeenAt === null ? "" : formatRelativeTime(lastSeenAt, relativeTimeLabelsFromT(t), renderedAt);
+        const connected = lastSeenAt !== null && fetchedAt !== null && fetchedAt - lastSeenAt <= 10 * 60 * 1000;
+        const age = lastSeenAt === null || fetchedAt === null ? "" : formatRelativeTime(lastSeenAt, relativeTimeLabelsFromT(t), fetchedAt);
         const steps = (
           <ol className="usage-companion-install-steps">
             <li>{t("usage.companion.installStep1")} <a className="btn btn-ghost btn-sm" href="https://github.com/lidge-jun/opencodex/releases/latest" target="_blank" rel="noreferrer">{t("common.github")}</a></li>

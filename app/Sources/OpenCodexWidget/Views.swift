@@ -57,13 +57,13 @@ struct OpenCodexWidgetView: View {
                 Circle().fill(tone(snapshot)).frame(width: 7, height: 7)
                 Text("OpenCodex").font(.caption).foregroundStyle(.secondary)
             }
-            Text(Format.count(snapshot.today?.requests))
+            Text(Format.tokens(snapshot.today?.totalTokens))
                 .font(.system(size: 28, weight: .semibold, design: .rounded))
                 .lineLimit(1)
                 .widgetAccentable()
-            Text("requests today").font(.caption).foregroundStyle(.secondary)
+            Text("tokens today").font(.caption).foregroundStyle(.secondary)
             HStack(spacing: 4) {
-                Text(Format.tokens(snapshot.today?.totalTokens))
+                Text("\(Format.count(snapshot.today?.requests)) req")
                 if let cost = snapshot.today?.estimatedCostUsd {
                     Text("·")
                     Text(Format.cost(cost))
@@ -81,8 +81,8 @@ struct OpenCodexWidgetView: View {
         HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 5) {
                 status(snapshot)
-                metric("Requests", Format.count(snapshot.today?.requests))
                 metric("Tokens", Format.tokens(snapshot.today?.totalTokens))
+                metric("Requests", Format.count(snapshot.today?.requests))
                 if let cost = snapshot.today?.estimatedCostUsd { metric("Cost", Format.cost(cost)) }
                 updated(snapshot)
             }
@@ -149,8 +149,8 @@ struct OpenCodexWidgetView: View {
 
     private func metricsRow(_ snapshot: WidgetSnapshot) -> some View {
         HStack(spacing: 10) {
-            metricColumn("REQUESTS", Format.count(snapshot.today?.requests))
             metricColumn("TOKENS", Format.tokens(snapshot.today?.totalTokens))
+            metricColumn("REQUESTS", Format.count(snapshot.today?.requests))
             metricColumn("COST", Format.cost(snapshot.today?.estimatedCostUsd))
         }
     }
