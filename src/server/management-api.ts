@@ -88,7 +88,8 @@ import { handleSessionRoutes } from "./management/session-routes";
 import { packageVersion } from "../lib/package-version";
 
 // installed npm version instead of a stale hardcode.
-export const VERSION = packageVersion("0.0.0");
+const MANAGEMENT_VERSION_FALLBACK = "0.0.0";
+export const VERSION = packageVersion(MANAGEMENT_VERSION_FALLBACK);
 
 const managementConvergenceBindings = new WeakMap<object, Readonly<{
   factory: (config: Readonly<OcxConfig>) => ConvergeCodex;
