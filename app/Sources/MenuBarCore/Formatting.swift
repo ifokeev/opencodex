@@ -29,7 +29,7 @@ public enum Format {
     public static func tokens(_ value: Int?) -> String {
         guard let value else { return unknown }
         if value < 1_000 { return String(value) }
-        return abbreviate(Double(value))
+        return abbreviate(Double(value), integer: true)
     }
 
     public static func cost(_ value: Double?) -> String {
@@ -71,7 +71,7 @@ public enum Format {
         return "\(seconds / 86_400)d ago"
     }
 
-    private static func abbreviate(_ value: Double) -> String {
+    private static func abbreviate(_ value: Double, integer: Bool = false) -> String {
         let units: [(threshold: Double, suffix: String)] = [
             (1_000_000_000_000, "T"),
             (1_000_000_000, "B"),
@@ -82,23 +82,24 @@ public enum Format {
         let ascending = units.reversed().map { $0 }
 
         for (index, unit) in ascending.enumerated() where value < (unit.threshold * 1000) {
-            let rendered = render(value / unit.threshold, suffix: unit.suffix)
+            let rendered = render(value / unit.threshold, suffix: unit.suffix, integer: integer)
             // Rounding can push a value across its own boundary: 999_999 scales to
             // 999.999K, which would render "1000K" instead of promoting to "1.00M".
             guard rendered.hasPrefix("1000"), index + 1 < ascending.count else { return rendered }
             let larger = ascending[index + 1]
-            return render(value / larger.threshold, suffix: larger.suffix)
+            return render(value / larger.threshold, suffix: larger.suffix, integer: integer)
         }
 
         // Beyond the largest unit, stay in that unit rather than inventing a suffix.
         if let largest = ascending.last, value >= largest.threshold {
-            return render(value / largest.threshold, suffix: largest.suffix)
+            return render(value / largest.threshold, suffix: largest.suffix, integer: integer)
         }
         return String(format: "%.0f", value)
     }
 
-    /// 3 significant figures: 36.5B, 1.20M, 233K.
-    private static func render(_ scaled: Double, suffix: String) -> String {
+    /// Render an abbreviated value with either integer or 3-significant-figure precision.
+    private static func render(_ scaled: Double, suffix: String, integer: Bool = false) -> String {
+        if integer { return String(format: "%.0f%@", scaled, suffix) }
         let decimals = scaled >= 100 ? 0 : (scaled >= 10 ? 1 : 2)
         return String(format: "%.\(decimals)f%@", scaled, suffix)
     }

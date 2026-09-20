@@ -64,6 +64,20 @@ export function bucketMinutesForWindow(hours: ChartHours): number {
   return CHART_BUCKET_MINUTES[hours];
 }
 
+export function formatCompanionTokens(value: number): string {
+  if (value < 1_000) return String(Math.round(value));
+  const units = [
+    [1_000_000_000_000, "T"],
+    [1_000_000_000, "B"],
+    [1_000_000, "M"],
+    [1_000, "K"],
+  ] as const;
+  for (const [threshold, suffix] of units) {
+    if (value >= threshold) return `${Math.round(value / threshold)}${suffix}`;
+  }
+  return String(Math.round(value));
+}
+
 export function buildCompanionSettingsPatch(
   patch: Partial<CompanionSettings>,
   availableModels: readonly string[] = [],

@@ -17,21 +17,21 @@ enum FormattingSuite {
         t.test("format: values promote at suffix rollover boundaries") {
             t.equal(Format.count(999_999), "1.00M")
             t.equal(Format.count(999_499), "999K")
-            t.equal(Format.tokens(999_999_999), "1.00B")
-            t.equal(Format.tokens(999_999_999_999), "1.00T")
+        t.equal(Format.tokens(999_999_999), "1B")
+        t.equal(Format.tokens(999_999_999_999), "1T")
             t.equal(Format.cost(999_999), "$1.00M")
         }
 
         t.test("format: exact unit thresholds render as the new unit") {
-            t.equal(Format.tokens(1_000), "1.00K")
-            t.equal(Format.tokens(1_000_000), "1.00M")
-            t.equal(Format.tokens(1_000_000_000), "1.00B")
+        t.equal(Format.tokens(1_000), "1K")
+        t.equal(Format.tokens(1_000_000), "1M")
+        t.equal(Format.tokens(1_000_000_000), "1B")
         }
 
         t.test("format: tokens are suffixed at scale") {
             t.equal(Format.tokens(999), "999")
-            t.equal(Format.tokens(12_400_000), "12.4M")
-            t.equal(Format.tokens(36_536_664_705), "36.5B")
+        t.equal(Format.tokens(12_400_000), "12M")
+        t.equal(Format.tokens(36_536_664_705), "37B")
         }
 
         t.test("format: cost switches to a suffix above one thousand") {

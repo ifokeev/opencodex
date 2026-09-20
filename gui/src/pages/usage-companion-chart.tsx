@@ -1,8 +1,8 @@
-import { formatTokens } from "../format-tokens";
 import type { Locale, TFn } from "../i18n/shared";
 import {
   chartPolylinePoints,
   chartStackedBarRects,
+  formatCompanionTokens,
   type UsageTimeline,
 } from "./usage-companion-utils";
 
@@ -101,7 +101,7 @@ export function UsageCompanionChart({
       <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={t("usage.companion.chartLabel")}>
         <line x1={PADDING} y1={y} x2={PADDING} y2={baseline} className="usage-companion-axis" />
         <line x1={PADDING} y1={baseline} x2={WIDTH - PADDING} y2={baseline} className="usage-companion-axis" />
-        <text x={PADDING - 4} y={y + 4} textAnchor="end" className="usage-companion-axis-label">{formatTokens(max, locale)}</text>
+        <text x={PADDING - 4} y={y + 4} textAnchor="end" className="usage-companion-axis-label">{formatCompanionTokens(max)}</text>
         {marks}
         {xLabels}
       </svg>
