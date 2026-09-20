@@ -12,8 +12,42 @@ import { waitForProviderRequestSlot } from "../../providers/request-pacing";
 import { withUpstreamHttpVersion } from "../../lib/upstream-http-version";
 import type { CodexWsQuotaObserver } from "./codex-ws-metadata";
 import { configuredOutboundFetch } from "../../lib/proxy-env";
+import {
+  InvalidProviderEgressError,
+  describeProviderEgressForLog,
+  providerEgressFetchInit,
+  providerEgressIsExplicit,
+  resolveProviderEgress,
+} from "../../lib/provider-egress";
 
 export { withUpstreamHttpVersion };
+
+const egressWebsocketDowngradeWarned = new Set<string>();
+
+/**
+ * Announce once, per provider, that an explicit egress route moved this provider off the
+ * WebSocket fast lane.
+ *
+ * The WebSocket upstream selects its proxy from the process environment when it dials, so it
+ * cannot carry a per-provider route. Serving the turn over HTTP/SSE honours the operator's
+ * egress choice, which is the one that has to win — but a transport change the operator did
+ * not ask for is exactly the kind of substitution this batch refuses to make silently, so it
+ * is stated rather than merely done.
+ */
+function warnEgressWebsocketDowngradeOnce(providerName: string, egress: string): void {
+  if (egressWebsocketDowngradeWarned.has(providerName)) return;
+  egressWebsocketDowngradeWarned.add(providerName);
+  console.warn(
+    `[opencodex] provider "${providerName}" declares egress ${egress}; the WebSocket upstream `
+    + "selects its proxy from the process environment and cannot carry a per-provider route, "
+    + "so these turns are served over HTTP/SSE.",
+  );
+}
+
+/** Test seam: the downgrade notice is once per provider per process, not once per request. */
+export function __resetEgressWebsocketDowngradeNotices(): void {
+  egressWebsocketDowngradeWarned.clear();
+}
 
 export function disableResponsesRequestTimeout(req: Request, server: Pick<Server<WsData>, "timeout"> | undefined): boolean {
   if (!server) return false;
@@ -130,11 +164,22 @@ export function providerFetch(
   runtime: BunRuntimeGateInput = currentBunRuntimeIdentity(),
   options: ProviderFetchOptions = {},
 ): ProviderFetch {
+  const providerName = options.providerName ?? "<unnamed provider>";
+  const customExecutor = (provider as OcxProviderConfig & { fetch?: typeof globalThis.fetch }).fetch;
+  // Resolved per request, not once per wrapper: `providers.<name>.noProxy` is evaluated against
+  // the destination, so two requests through the same executor can legitimately take different
+  // routes. A malformed value throws here and rejects the request rather than degrading to the
+  // global proxy or to direct, either of which would read as success at the call site.
+  const egressFor = (input: Parameters<typeof globalThis.fetch>[0]) => resolveProviderEgress({
+    providerName,
+    provider,
+    url: typeof input === "string" ? input : input instanceof URL ? input : input.url,
+  });
   const configuredFetch = Object.assign(
     (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => configuredOutboundFetch(input, init),
     { preconnect: globalThis.fetch.preconnect?.bind(globalThis.fetch) },
   ) as typeof globalThis.fetch;
-  const base = (provider as OcxProviderConfig & { fetch?: typeof globalThis.fetch }).fetch ?? configuredFetch;
+  const base = customExecutor ?? configuredFetch;
   const preconnect = (...args: Parameters<typeof globalThis.fetch.preconnect>): void => {
     base.preconnect?.(...args);
   };
@@ -147,12 +192,27 @@ export function providerFetch(
   ) as typeof globalThis.fetch;
   const httpFetch = Object.assign(
     async (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => {
+      const egress = egressFor(input);
+      if (providerEgressIsExplicit(egress) && customExecutor) {
+        // Same refusal as the outbound transport: an executor the caller supplied owns its own
+        // routing, so the configured route cannot be honoured and must not be ignored either.
+        throw new InvalidProviderEgressError(
+          "proxy",
+          "a caller-supplied fetch executor owns its own routing, so this route cannot be applied",
+          `providers.${providerName}.proxy cannot be applied to a caller-supplied fetch executor; `
+          + "remove the provider egress override or the custom executor",
+        );
+      }
       // The hook inspects the outgoing headers and refuses the send by throwing; it is not a
       // mutator, and the copy it receives is deliberately not threaded onward. `Connection`
       // is decided inside `dispatch`, which runs after this, so the fresh-connection policy
       // wins regardless of what any caller or hook put in the header.
       options.beforeDispatch?.(new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined)));
-      const dispatchInit = { ...withUpstreamHttpVersion(input, init, provider), timeout: 0 };
+      const dispatchInit = {
+        ...withUpstreamHttpVersion(input, init, provider),
+        timeout: 0,
+        ...providerEgressFetchInit(egress),
+      };
       return options.dispatchOverride
         ? options.dispatchOverride(input, dispatchInit, dispatch)
         : dispatch(input, dispatchInit);
@@ -165,6 +225,11 @@ export function providerFetch(
   const unpaced = async (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => {
     const upstreamWebsocket = provider.upstreamWebsocket === true;
     if (typeof input === "string" && init && shouldUseCodexWsUpstream(input, init, runtime, upstreamWebsocket)) {
+      const egress = egressFor(input);
+      if (providerEgressIsExplicit(egress)) {
+        warnEgressWebsocketDowngradeOnce(providerName, describeProviderEgressForLog(egress));
+        return httpFetch(input, init);
+      }
       // The fallback has to be the same HTTP fetch the non-WS branch would have
       // used, protocol pin included: a WS turn that falls back is serving the
       // request over HTTP, and dropping the provider's `upstreamHttpVersion`
