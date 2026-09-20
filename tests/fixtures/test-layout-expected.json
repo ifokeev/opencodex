@@ -1,5 +1,4 @@
 {
-  "macos-build-script.test.ts": "gui",
   "gui-desktop-sidecar-script.test.ts": "gui",
   "standalone-build-script.test.ts": "gui",
   "standalone-service.test.ts": "service",

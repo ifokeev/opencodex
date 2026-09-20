@@ -104,7 +104,7 @@ bir hesap varsa — genellikle Codex Desktop girişiniz — hesaplara bir seçim
 Panoyu açmadan proxy durumunu, kullanımı ve sağlayıcı kotalarını gösteren yerel yardımcı uygulama.
 Kaynak kodu [`app/`](../app) konumundadır (Swift + AppKit, üçüncü taraf bağımlılığı yoktur).
 [Sürümler sayfasından](https://github.com/lidge-jun/opencodex/releases) indirin veya
-`bun run build:macos` ile yerel olarak derleyin.
+`bun run prepare-sidecar && bun run prepare-widget && bunx tauri build` ile yerel olarak derleyin.
 
 Uygulama noter tasdikli olmadığından ve ad hoc imzalandığından ilk açılışta sağ tıklayıp Aç'ı seçin.
 Ayrıntılar için [macOS menü çubuğu uygulaması kılavuzuna](https://lidge-jun.github.io/opencodex/guides/macos-menu-bar/) bakın.

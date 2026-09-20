@@ -9,6 +9,12 @@ description: Нативное приложение, показывающее с�
 Это отдельная программа. `ocx` работает как раньше, а приложение в строке меню —
 клиент, который обращается к локальному management API.
 
+## Настольное приложение (Tauri)
+
+Ту же панель можно открыть в настольном приложении OpenCodex. Панель компаньона показывает
+шаги установки для выбранной ОС, а пункт **Открыть в браузере** открывает текущий экран
+в обычном браузере, когда панель работает внутри desktop shell.
+
 ## Установка
 
 Скачайте `OpenCodex-<версия>-macos-universal.zip` со
@@ -136,11 +142,13 @@ xattr -d com.apple.quarantine /Applications/OpenCodex.app
 ```bash
 git clone https://github.com/lidge-jun/opencodex.git
 cd opencodex
-bun run build:macos
+bun run prepare-sidecar
+bun run prepare-widget
+bunx tauri build
 ```
 
-Бандл появится в `dist/macos/OpenCodex.app`. Без Bun скрипт можно запустить напрямую:
-`bash scripts/build-macos-app.sh`.
+Бандл появится в выходных файлах Tauri, а расширение WidgetKit будет включено в
+`OpenCodex.app/Contents/PlugIns/`.
 
 Для универсального бинарника (`UNIVERSAL=1`) нужен полный Xcode: в Command Line Tools есть
 только библиотеки совместимости Swift для текущей архитектуры, и сборка сообщит об этом
@@ -150,7 +158,7 @@ bun run build:macos
 подписать с hardened runtime вместо ad-hoc:
 
 ```bash
-MACOS_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" bun run build:macos
+MACOS_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" bun run prepare-widget
 ```
 
 ## Удаление

@@ -17,8 +17,16 @@ Tauri. Generated files under desktop/src-tauri/binaries/ and
 desktop/src-tauri/resources/ remain ignored.
 
 The management API companion presence check in
-`src/server/management/companion-routes.ts` accepts both
-`OpenCodexMenuBar/` and `OpenCodexDesktop/` user agents. This is presence
-telemetry only; management authentication remains in the shared API boundary.
+`src/server/management/companion-routes.ts` recognizes the
+`OpenCodexDesktop/` user agent. This is presence telemetry only; management
+authentication remains in the shared API boundary.
 The desktop webview uses a Mozilla-compatible `OpenCodexDesktop/` user-agent
 marker, which the GUI detects to identify the shell without using IPC.
+
+## Widget snapshot
+
+The macOS desktop shell writes the WidgetKit snapshot to
+`~/Library/Containers/com.opencodex.desktop.widget/Data/Library/Application Support/OpenCodex/snapshot.json`.
+The schema version is `1`; the Rust writer refreshes it every five minutes after an
+immediate first write. The WidgetKit appex reads this privacy-safe file and performs no
+network access.
