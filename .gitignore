@@ -72,3 +72,7 @@ go/
 native/**/target/
 dist/macos/
 dist/release/
+desktop/src-tauri/binaries/
+desktop/src-tauri/resources/
+desktop/src-tauri/gen/
+desktop/src-tauri/target/

@@ -81,6 +81,9 @@ describe("companion settings", () => {
       expect(ordinary.body.companion.lastSeenAt).toBeNull();
       const companion = await call("GET", undefined, "OpenCodexMenuBar/2.60.0");
       expect(companion.body.companion.lastSeenAt).toBeNumber();
+      resetCompanionPresenceForTests();
+      const desktop = await call("GET", undefined, "OpenCodexDesktop/2.61.0");
+      expect(desktop.body.companion.lastSeenAt).toBeNumber();
     });
   });
 });

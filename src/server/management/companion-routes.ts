@@ -27,7 +27,10 @@ function response(): Response {
 
 export async function handleCompanionRoutes(ctx: ManagementContext): Promise<Response | null> {
   if (ctx.url.pathname === "/api/companion/settings" && ctx.req.method === "GET") {
-    if (ctx.req.headers.get("user-agent")?.startsWith("OpenCodexMenuBar/")) companionLastSeenAt = Date.now();
+    const userAgent = ctx.req.headers.get("user-agent") ?? "";
+    if (userAgent.startsWith("OpenCodexMenuBar/") || userAgent.startsWith("OpenCodexDesktop/")) {
+      companionLastSeenAt = Date.now();
+    }
     return response();
   }
   if (ctx.url.pathname !== "/api/companion/settings" || ctx.req.method !== "PUT") return null;

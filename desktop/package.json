@@ -1,0 +1,12 @@
+{
+  "name": "@opencodex/desktop",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "prepare-sidecar": "bun scripts/prepare-sidecar.ts"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.5.0"
+  }
+}
