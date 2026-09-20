@@ -231,6 +231,7 @@ mod macos {
             let models = models
                 .iter()
                 .filter_map(Value::as_str)
+                .map(percent_encode)
                 .collect::<Vec<_>>()
                 .join(",");
             if !models.is_empty() {
@@ -239,6 +240,19 @@ mod macos {
             }
         }
         query
+    }
+
+    fn percent_encode(value: &str) -> String {
+        let mut encoded = String::with_capacity(value.len());
+        for byte in value.bytes() {
+            match byte {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                    encoded.push(byte as char)
+                }
+                _ => encoded.push_str(&format!("%{byte:02X}")),
+            }
+        }
+        encoded
     }
 
     fn snapshot_path() -> PathBuf {
@@ -486,6 +500,14 @@ mod macos {
             changed.generated_at = 2.0;
             assert!(!write_if_changed(&path, Some(&snapshot), &changed).unwrap());
             let _ = fs::remove_file(path);
+        }
+
+        #[test]
+        fn timeline_query_encodes_model_ids() {
+            let query = timeline_query(&json!({
+                "settings": { "models": ["openai/gpt-4.1", "claude 3,5"] }
+            }));
+            assert!(query.ends_with("&models=openai%2Fgpt-4.1,claude%203%2C5"));
         }
 
         #[test]
