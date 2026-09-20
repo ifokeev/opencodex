@@ -34,10 +34,6 @@ impl ProxyClient {
         self.endpoint
     }
 
-    pub async fn startup_health(&self) -> Result<Value, ProxyError> {
-        self.get("/api/startup-health").await
-    }
-
     pub async fn is_alive(&self) -> Result<Value, ProxyError> {
         self.get("/healthz").await
     }

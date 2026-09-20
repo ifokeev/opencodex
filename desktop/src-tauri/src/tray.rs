@@ -25,6 +25,7 @@ pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
         .spawned_by_us
         .load(Ordering::Relaxed);
     let stop = MenuItem::with_id(app, "stop-proxy", "Stop proxy", spawned_by_us, None::<&str>)?;
+    let stop_item = stop.clone();
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(
         app,
@@ -82,8 +83,13 @@ pub fn install(app: &AppHandle, proxy: ProxyClient) -> tauri::Result<()> {
                         .load(Ordering::Relaxed)
                     {
                         let proxy = app.state::<crate::AppState>().proxy.clone();
+                        let app = app.clone();
+                        let stop_item = stop_item.clone();
                         tauri::async_runtime::spawn(async move {
-                            let _ = proxy.stop().await;
+                            if proxy.stop().await.is_ok() {
+                                app.state::<crate::AppState>().shutdown_child();
+                                let _ = stop_item.set_enabled(false);
+                            }
                         });
                     }
                 }

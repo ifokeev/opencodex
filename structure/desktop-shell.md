@@ -8,6 +8,8 @@ and owns the tray, autostart, single-instance, and window lifecycle behavior.
 `desktop/ui/` is only a short bootstrap page. Once `/healthz` answers, the shell
 navigates the webview to the proxy's loopback dashboard
 (`/#/usage`) rather than bundling or serving `gui/dist` itself.
+Only the bootstrap page has Tauri IPC capability; the loopback dashboard never
+does because `dangerousRemoteDomainIpcAccess` is not configured.
 
 `desktop/scripts/prepare-sidecar.ts` maps Rust target triples to the standalone
 Bun targets and prepares the external binary plus dashboard resources used by
