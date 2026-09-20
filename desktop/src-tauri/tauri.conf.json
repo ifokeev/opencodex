@@ -25,7 +25,10 @@
       "icons/icon.png"
     ],
     "macOS": {
-      "minimumSystemVersion": "13.0"
+      "minimumSystemVersion": "13.0",
+      "files": {
+        "PlugIns/OpenCodexWidget.appex": "widget/OpenCodexWidget.appex"
+      }
     },
     "windows": {
       "webviewInstallMode": {

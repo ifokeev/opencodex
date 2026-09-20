@@ -1151,8 +1151,8 @@ jobs:
   # `if: always()` is load-bearing. Without it, a failed or skipped dependency
   # skips this job too — and GitHub reports a skipped job as success, so the gate
   # would go green precisely when something went wrong.
-  macos-app:
-    name: macos app
+  widget:
+    name: macos widget
     needs: [changes, gates]
     if: github.event_name != 'pull_request' || needs.changes.outputs.ci == 'true'
     runs-on: macos-latest
@@ -1171,11 +1171,16 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Test macOS menu bar app
+      - name: Test MenuBarCore
         run: bun run test:macos
 
-      - name: Build macOS menu bar app
-        run: bun run build:macos
+      - name: Build WidgetKit appex
+        run: bash desktop/scripts/build-widget.sh
+
+      - name: Verify WidgetKit appex
+        run: |
+          test -x desktop/src-tauri/widget/OpenCodexWidget.appex/Contents/MacOS/OpenCodexWidget
+          codesign -dv desktop/src-tauri/widget/OpenCodexWidget.appex
 
   desktop-shell:
     name: desktop shell
@@ -1225,7 +1230,7 @@ jobs:
     # direct dependencies only, so a failing `select-windows-runner` would
     # otherwise reach this gate as nothing at all while its dependents report
     # `skipped`, which is the shape the step below is written to catch.
-    needs: [changes, select-windows-runner, test, storage-policy, api-usage, gates, platform-macos, macos-control, platform-windows, keyring-smoke, docker-smoke, docs-site-build, structure-gate, npm-global-smoke, macos-app, desktop-shell]
+    needs: [changes, select-windows-runner, test, storage-policy, api-usage, gates, platform-macos, macos-control, platform-windows, keyring-smoke, docker-smoke, docs-site-build, structure-gate, npm-global-smoke, widget, desktop-shell]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -1291,13 +1296,13 @@ jobs:
           GATED_JOBS="changes select-windows-runner test storage-policy api-usage gates"
           GATED_JOBS="$GATED_JOBS platform-macos keyring-smoke docker-smoke npm-global-smoke"
           GATED_JOBS="$GATED_JOBS macos-control platform-windows docs-site-build"
-          GATED_JOBS="$GATED_JOBS structure-gate macos-app"
+          GATED_JOBS="$GATED_JOBS structure-gate widget"
           GATED_JOBS="$GATED_JOBS desktop-shell"
 
           expected_for() {
             case "$1" in
               changes|select-windows-runner) echo requested ;;
-              test|storage-policy|api-usage|gates|platform-macos|keyring-smoke|docker-smoke|macos-app)
+              test|storage-policy|api-usage|gates|platform-macos|keyring-smoke|docker-smoke|widget)
                 echo "$scoped" ;;
               desktop-shell)
                 echo "$scoped" ;;
