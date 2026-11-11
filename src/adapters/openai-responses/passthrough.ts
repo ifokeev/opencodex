@@ -26,6 +26,7 @@ import { rewriteRoutedNamespaceToolsForUpstream } from "../../responses/namespac
 import { repairLegacyDottedToolCallNames } from "../../responses/legacy-dotted-tool-name-repair";
 import { preparePlaintextV2AgentMessages } from "../../responses/plaintext-v2-agent-messages";
 import { isMetaAiResponsesDestination, rewriteMuseToolNamesForUpstream } from "../../responses/muse-tool-name-alias";
+import { aliasMuseSubscriptionBuiltinTools, mergeMuseToolNameAliases } from "../../responses/muse-subscription-tool-alias";
 import { buildResponsesTransport } from "./transport";
 export { FORWARD_HEADERS } from "./transport";
 import { normalizeResponsesCodeMode } from "../responses-code-mode";
@@ -379,9 +380,13 @@ export function createResponsesPassthroughAdapter(provider: OcxProviderConfig): 
         // including default muse-spark-1.3. Do not reuse the contributor/Zen web_search
         // predicates. Namespace flattening has already produced the public wire names.
         if (isMetaAiResponsesDestination(url)) {
+          const subscription = incoming.providerName === "meta-muse"
+            ? aliasMuseSubscriptionBuiltinTools(outBody)
+            : { body: outBody, aliases: new Map<string, string>() };
+          outBody = subscription.body;
           const rewritten = rewriteMuseToolNamesForUpstream(outBody);
           outBody = rewritten.body;
-          convertedMuseToolNameAliases = rewritten.aliases;
+          convertedMuseToolNameAliases = mergeMuseToolNameAliases(subscription.aliases, rewritten.aliases);
         }
         // Last, so promoted namespace children are also cleared of Codex-private fields.
         outBody = stripCanonicalOnlyToolFields(outBody, provider.supportsOpenAiWebSearchToolFields === false);
